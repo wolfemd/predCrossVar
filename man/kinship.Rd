@@ -7,10 +7,12 @@
 kinship(M, type)
 }
 \arguments{
-\item{type}{}
+\item{M}{dosage matrix. Assumes SNPs in M coded 0, 1, 2 (requires rounding dosages to integers). M is Nind x Mrow, numeric matrix, with row/columanes to indicate SNP/ind ID.}
+
+\item{type}{string, "add" or "dom". type="add" gives same as rrBLUP::A.mat(), i.e. Van Raden, Method 1. type="dom" gives classical parameterization according to Vitezica et al. 2013.}
 }
 \value{
-
+square symmetic genomic relationship matrix
 }
 \description{
 Function to create additive and dominance genomic relationship matrices from biallelic dosages.

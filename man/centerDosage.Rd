@@ -2,7 +2,7 @@
 % Please edit documentation in R/predCrossVar.R
 \name{centerDosage}
 \alias{centerDosage}
-\title{Title}
+\title{centerDosage}
 \usage{
 centerDosage(M)
 }
@@ -13,5 +13,8 @@ centerDosage(M)
 
 }
 \description{
-Title
+Test
+}
+\examples{
+centeredM<-centerDosage(M)
 }

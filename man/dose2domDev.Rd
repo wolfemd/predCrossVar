@@ -2,7 +2,7 @@
 % Please edit documentation in R/predCrossVar.R
 \name{dose2domDev}
 \alias{dose2domDev}
-\title{Title}
+\title{dose2domDev}
 \usage{
 dose2domDev(M)
 }
@@ -13,5 +13,8 @@ dose2domDev(M)
 
 }
 \description{
-Title
+Test
+}
+\examples{
+domDev<-dose2domDev(M)
 }

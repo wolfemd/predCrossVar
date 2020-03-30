@@ -1,4 +1,6 @@
-#' Title
+#' kinship function
+#'
+#' Function to create additive and dominance genomic relationship matrices from biallelic dosages.
 #'
 #' @param M
 #' @param type
@@ -7,6 +9,7 @@
 #' @export
 #'
 #' @examples
+#' K<-kinship(M,"add")
 kinship<-function(M,type){
       # Assumes SNPs in M coded 0, 1, 2 (requires rounding dosages to integers)
       # M is Nind x Mrow, numeric matrix, with row/columanes to indicate SNP/ind ID
@@ -35,7 +38,9 @@ kinship<-function(M,type){
       }
 }
 
-#' Title
+#' makeGRM function
+#'
+#' function to create a additive or dominance kinship matrix from a AlphaSimR pop-class object. A wrapper for the kinship() function.
 #'
 #' @param pop
 #' @param SP
@@ -45,13 +50,17 @@ kinship<-function(M,type){
 #' @export
 #'
 #' @examples
+#'  K<-makeGRM(pop, SP, type="add")
+#'
 makeGRM<-function(pop, SP, type){
       grm<-kinship(M=pullSnpGeno(pop=pop, simParam=SP),
                    type=type)
       return(grm)
 }
 
-#' Title
+#' centerDosage
+#'
+#' Test
 #'
 #' @param M
 #'
@@ -59,6 +68,7 @@ makeGRM<-function(pop, SP, type){
 #' @export
 #'
 #' @examples
+#' centeredM<-centerDosage(M)
 centerDosage<-function(M){
       # Modified from my "kinship" function
       # Converts a dosage matrix into a centered-dosage
@@ -71,7 +81,9 @@ centerDosage<-function(M){
       return(Z)
 }
 
-#' Title
+#' dose2domDev
+#'
+#' Test
 #'
 #' @param M
 #'
@@ -79,6 +91,7 @@ centerDosage<-function(M){
 #' @export
 #'
 #' @examples
+#' domDev<-dose2domDev(M)
 dose2domDev<-function(M){
       # Modified from my "kinship" function
       # Converts a dosage matrix into a matrix of centered dominance deviations

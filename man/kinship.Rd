@@ -2,7 +2,7 @@
 % Please edit documentation in R/predCrossVar.R
 \name{kinship}
 \alias{kinship}
-\title{Title}
+\title{kinship function}
 \usage{
 kinship(M, type)
 }
@@ -13,5 +13,8 @@ kinship(M, type)
 
 }
 \description{
-Title
+Function to create additive and dominance genomic relationship matrices from biallelic dosages.
+}
+\examples{
+K<-kinship(M,"add")
 }

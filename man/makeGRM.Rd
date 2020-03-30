@@ -2,7 +2,7 @@
 % Please edit documentation in R/predCrossVar.R
 \name{makeGRM}
 \alias{makeGRM}
-\title{Title}
+\title{makeGRM function}
 \usage{
 makeGRM(pop, SP, type)
 }
@@ -13,5 +13,9 @@ makeGRM(pop, SP, type)
 
 }
 \description{
-Title
+function to create a additive or dominance kinship matrix from a AlphaSimR pop-class object. A wrapper for the kinship() function.
+}
+\examples{
+ K<-makeGRM(pop, SP, type="add")
+
 }

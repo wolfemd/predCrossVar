@@ -200,7 +200,7 @@ genomicVarD_m1<-function(snpVarD,freq){
 #' Z<-centerDosage(M)
 #' genoVarCovarMat<-genoVarCovarMatFunc(Z)
 genoVarCovarMatFunc<-function(Z){
-      SigmaM<-1/ncol(Z)*t(Z)%*%Z
+      SigmaM<-1/nrow(Z)*t(Z)%*%Z
       return(SigmaM)
 }
 

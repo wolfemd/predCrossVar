@@ -363,3 +363,32 @@ runCrossVarPredsAD<-function(outprefix=NULL,outpath=NULL,
       }
       return(predictedfamvars)
 }
+
+#' backsolveSNPeff
+#'
+#' From the GBLUP solutions and a centered SNP matrix backsolve SNP effects
+#'
+#' @param Z Centered marker matrix (dominance deviations must also be centered)
+#' @param g The solutions (blups, i.e. GEBVs) from the GBLUP model
+#'
+#' @return matrix of SNP effects matching RR-BLUP / SNP-BLUP
+#' @export
+#'
+#' @examples
+#' A<-kinship(M,type="add")
+#' trainingDF %<>% dplyr::mutate(ga=factor(as.character(id),
+#'                                         levels=rownames(A)),
+#'                               gd=ga)
+#' gblup<-mmer(pheno~1,
+#'             random=~vs(ga,Gu = A),
+#'             weights=WT,
+#'             data=trainingDF,verbose = T)
+#' ga<-as.matrix(gblup$U$`u:ga`$pheno,ncol=1)
+#' Za<-centerDosage(M)
+#' snpeff<-backsolveSNPeff(Za,ga)
+backsolveSNPeff<-function(Z,g){
+      ZZt<-tcrossprod(Z)
+      diag(ZZt)<-diag(ZZt)+1e-8
+      bslvEffs<-crossprod(Z,solve(ZZt))%*%g
+      return(bslvEffs)
+}

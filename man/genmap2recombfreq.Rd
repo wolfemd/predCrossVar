@@ -4,10 +4,12 @@
 \alias{genmap2recombfreq}
 \title{genmap2recombfreq}
 \usage{
-genmap2recombfreq(m)
+genmap2recombfreq(m, nChr)
 }
 \arguments{
 \item{m}{vector of centiMorgan-scale genetic positions. names(m) correspond to a SNP_ID. Since m potentially contains all chromosomes, sets recomb. freq. b/t chrom. to 0.5}
+
+\item{nChr}{number of chromosomes}
 }
 \value{
 potentially really large matrix of pairwise recombination frequencies between loci
@@ -16,5 +18,6 @@ potentially really large matrix of pairwise recombination frequencies between lo
 Compute the pairwise recombination frequencies between all loci from genetic map positions.
 }
 \details{
-May be worth computing in an R session using multi-threaded BLAS
+names(m) must be formatted as "chr"_"id" with "chr" being integer. For example: 2_QTL1 for a locus on chr. 2.
+May be worth computing in an R session using multi-threaded BLAS.
 }

@@ -234,16 +234,19 @@ getM2varcomp<-function(effects,varcovarmat,type){
 #' Compute the pairwise recombination frequencies between all loci from genetic map positions.
 #'
 #' @param m vector of centiMorgan-scale genetic positions. names(m) correspond to a SNP_ID. Since m potentially contains all chromosomes, sets recomb. freq. b/t chrom. to 0.5
-#' @details May be worth computing in an R session using multi-threaded BLAS
+#' @param nChr number of chromosomes
+#'
+#' @details names(m) must be formatted as "chr"_"id" with "chr" being integer. For example: 2_QTL1 for a locus on chr. 2.
+#' May be worth computing in an R session using multi-threaded BLAS.
 #' @return potentially really large matrix of pairwise recombination frequencies between loci
 #' @export
 #'
 #' @examples
-genmap2recombfreq<-function(m){
+genmap2recombfreq<-function(m,nChr){
       d<-as.matrix(dist(m,upper=T,diag = T,method='manhattan'))
       c1<-0.5*(1-exp(-2*d))
       # Since m contains all chromosomes, set recomb. freq. b/t chrom. to 0.5
-      for(i in 1:18){
+      for(i in 1:nChr){
             c1[grepl(paste0("^",i,"_"),rownames(c1)),!grepl(paste0("^",i,"_"),colnames(c1))]<-0.5
             c1[!grepl(paste0("^",i,"_"),rownames(c1)),grepl(paste0("^",i,"_"),colnames(c1))]<-0.5
       }

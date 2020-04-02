@@ -267,7 +267,8 @@ genmap2recombfreq<-function(m,nChr){
 #'
 #' @examples
 calcGameticLD<-function(parentGID,recombFreqMat,haploMat){
-      X<-haploMat[grep(paste0(parentGID,"_"),rownames(haploMat)),]
+      X<-haploMat[grep(paste0(parentGID,"_"),rownames(haploMat)),,drop=F]
+      ### drop=F safegaurds against matrix->vector conversion if only 1 seg. locus (column)
       # Equiv versions (in case another is more efficient)
       # Version1
       D<-recombFreqMat*((0.5*crossprod(X))-tcrossprod(colMeans(X)))
@@ -298,19 +299,20 @@ calcGameticLD<-function(parentGID,recombFreqMat,haploMat){
 #'
 #' @examples
 predCrossVarAD<-function(sireID,damID,addEffects,domEffects,
-                     haploMat,recombFreqMat,...){
-      #gcbegin<-gc(reset = T)
-      starttime<-proc.time()[3]
-      # check for and remove SNPs fixed in parents
-      ### hopes to save time / mem
-      x<-colSums(rbind(haploMat[grep(paste0(sireID,"_"),rownames(haploMat)),],
-                       haploMat[grep(paste0(damID,"_"),rownames(haploMat)),]))
-      segsnps2keep<-names(x[x>0 & x<4])
-      if(length(segsnps2keep)>0){
-      haploMat<-haploMat[,segsnps2keep]
-      recombFreqMat<-recombFreqMat[segsnps2keep,segsnps2keep]
-      addEffects<-addEffects[segsnps2keep,]
-      domEffects<-domEffects[segsnps2keep,]
+                         haploMat,recombFreqMat,...){
+   #gcbegin<-gc(reset = T)
+   starttime<-proc.time()[3]
+   # check for and remove SNPs fixed in parents
+   ### hopes to save time / mem
+   x<-colSums(rbind(haploMat[grep(paste0(sireID,"_"),rownames(haploMat)),],
+                    haploMat[grep(paste0(damID,"_"),rownames(haploMat)),]))
+   segsnps2keep<-names(x[x>0 & x<4])
+   if(length(segsnps2keep)>0){
+      # drop=F safegaurds against matrix->vector conversion if only 1 seg. locus (column)
+      haploMat<-haploMat[,segsnps2keep,drop=F]
+      recombFreqMat<-recombFreqMat[segsnps2keep,segsnps2keep,drop=F]
+      addEffects<-addEffects[segsnps2keep,,drop=F]
+      domEffects<-domEffects[segsnps2keep,,drop=F]
       # sire and dam LD matrices
       sireLD<-calcGameticLD(sireID,recombFreqMat,haploMat)
       damLD<-calcGameticLD(damID,recombFreqMat,haploMat)
@@ -328,14 +330,14 @@ predCrossVarAD<-function(sireID,damID,addEffects,domEffects,
                   segsnps=list(segsnps2keep),
                   computetime=totcomputetime)
       print(paste0("Variances predicted for family: ",sireID,"x",damID,"- took ",round(totcomputetime/60,3)," mins"))
-      } else {
-            out<-tibble(varA=0,
-                        varD=0,
-                        segsnps=list(),
-                        computetime=0)
-            print(paste0("Variances predicted for family: ",sireID,"x",damID,"- had no segregating SNPs"))
-      }
-      return(out)
+   } else {
+      out<-tibble(varA=0,
+                  varD=0,
+                  segsnps=list(),
+                  computetime=0)
+      print(paste0("Variances predicted for family: ",sireID,"x",damID,"- had no segregating SNPs"))
+   }
+   return(out)
 }
 
 

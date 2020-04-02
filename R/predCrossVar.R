@@ -327,14 +327,14 @@ predCrossVarAD<-function(sireID,damID,addEffects,domEffects,
                   varD=predDom,
                   segsnps=list(segsnps2keep),
                   computetime=totcomputetime)
+      print(paste0("Variances predicted for family: ",sireID,"x",damID,"- took ",round(totcomputetime/60,3)," mins"))
       } else {
             out<-tibble(varA=0,
                         varD=0,
                         segsnps=list(),
                         computetime=0)
+            print(paste0("Variances predicted for family: ",sireID,"x",damID,"- had no segregating SNPs"))
       }
-
-      print(paste0("Variances predicted for family: ",sireID,"x",damID,"- took ",round(totcomputetime/60,3)," mins"))
       return(out)
 }
 

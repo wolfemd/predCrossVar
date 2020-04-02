@@ -327,6 +327,7 @@ predCrossVarAD<-function(sireID,damID,addEffects,domEffects,
                   varD=predDom,
                   segsnps=list(segsnps2keep),
                   computetime=totcomputetime)
+<<<<<<< HEAD
       } else {
             out<-tibble(varA=0,
                         varD=0,
@@ -334,6 +335,8 @@ predCrossVarAD<-function(sireID,damID,addEffects,domEffects,
                         computetime=0)
       }
 
+=======
+>>>>>>> 2c886da56114fbbcb93e36f2f55fda0f9127f75b
       print(paste0("Variances predicted for family: ",sireID,"x",damID,"- took ",round(totcomputetime/60,3)," mins"))
       return(out)
 }

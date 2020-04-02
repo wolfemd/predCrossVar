@@ -327,7 +327,11 @@ predCrossVarAD<-function(sireID,damID,addEffects,domEffects,
                   varD=predDom,
                   segsnps=list(segsnps2keep),
                   computetime=totcomputetime)
+<<<<<<< HEAD
       print(paste0("Variances predicted for family: ",sireID,"x",damID,"- took ",round(totcomputetime/60,3)," mins"))
+=======
+<<<<<<< HEAD
+>>>>>>> 3571497e76f44a390afd9732eb99a8ea329fc6f6
       } else {
             out<-tibble(varA=0,
                         varD=0,
@@ -335,6 +339,13 @@ predCrossVarAD<-function(sireID,damID,addEffects,domEffects,
                         computetime=0)
             print(paste0("Variances predicted for family: ",sireID,"x",damID,"- had no segregating SNPs"))
       }
+<<<<<<< HEAD
+=======
+
+=======
+>>>>>>> 2c886da56114fbbcb93e36f2f55fda0f9127f75b
+      print(paste0("Variances predicted for family: ",sireID,"x",damID,"- took ",round(totcomputetime/60,3)," mins"))
+>>>>>>> 3571497e76f44a390afd9732eb99a8ea329fc6f6
       return(out)
 }
 

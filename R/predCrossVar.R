@@ -267,9 +267,15 @@ genmap2recombfreq<-function(m,nChr){
 #'
 #' @examples
 calcGameticLD<-function(parentGID,recombFreqMat,haploMat){
-      X<-haploMat[grep(parentGID,rownames(haploMat)),]
-      p<-colMeans(haploMat[grep(parentGID,rownames(haploMat)),])
-      D<-recombFreqMat*((0.5*t(X)%*%X)-p%*%t(p))
+      X<-haploMat[grep(paste0(parentGID,"_"),rownames(haploMat)),]
+      # Equiv versions (in case another is more efficient)
+      # Version1
+      D<-recombFreqMat*((0.5*crossprod(X))-tcrossprod(colMeans(X)))
+      # Version2
+      # p<-colMeans(X)
+      # D<-recombFreqMat*((0.5*t(X)%*%X)-p%*%t(p))
+      # Version3
+      # D<-recombFreqMat*(crossprod(scale(X,scale = F))/2)
       return(D)
 }
 
@@ -279,11 +285,13 @@ calcGameticLD<-function(parentGID,recombFreqMat,haploMat){
 #'
 #' @param sireID string, Sire genotype ID. Needs to correspond to renames in haploMat
 #' @param damID string, Dam genotype ID. Needs to correspond to renames in haploMat
-#' @param addEffects vector of _additive_ SNP effects estimate. Ideally vector is named with SNP IDs and matches the order of related SNP matrices.
-#' @param domEffects vector of _dominance_ SNP effects estimate. Ideally vector is named with SNP IDs and matches the order of related SNP matrices.
+#' @param addEffects column matrix of _additive_ SNP effects estimate with rownames == SNP_IDs and matches the order of related SNP matrices.
+#' @param domEffects column matrix of _dominance_ SNP effects estimate with rownames == SNP_IDs and matches the order of related SNP matrices.
 #' @param haploMat matrix of phased haplotypes, 2 rows per sample, cols = loci, {0,1}, rownames assumed to contain GIDs with a suffix, separated by "_" to distinguish haplotypes
 #' @param recombFreqMat a square symmetric matrix with values = (1-2*c1), where c1=matrix of expected recomb. frequencies. The choice to do 1-2c1 outside the function was made for computation efficiency; every operation on a big matrix takes time.
 #' @param ...
+#'
+#' @details SNP_IDs must match: names(addEffects)==names(domEffects)==colnames(haploMat)==rownames(recombFreqMat)==colnames(recombFreqMat).
 #'
 #' @return a tibble with values for predicted add/dom variances as well as compute time and memory usage stats
 #' @export
@@ -291,17 +299,18 @@ calcGameticLD<-function(parentGID,recombFreqMat,haploMat){
 #' @examples
 predCrossVarAD<-function(sireID,damID,addEffects,domEffects,
                      haploMat,recombFreqMat,...){
-      gcbegin<-gc(reset = T)
+      #gcbegin<-gc(reset = T)
       starttime<-proc.time()[3]
       # check for and remove SNPs fixed in parents
       ### hopes to save time / mem
-      x<-colSums(rbind(haploMat[grep(sireID,rownames(haploMat)),],
-                       haploMat[grep(damID,rownames(haploMat)),]))
+      x<-colSums(rbind(haploMat[grep(paste0(sireID,"_"),rownames(haploMat)),],
+                       haploMat[grep(paste0(damID,"_"),rownames(haploMat)),]))
       segsnps2keep<-names(x[x>0 & x<4])
+      if(length(segsnps2keep)>0){
       haploMat<-haploMat[,segsnps2keep]
       recombFreqMat<-recombFreqMat[segsnps2keep,segsnps2keep]
-      addEffects<-addEffects[segsnps2keep]
-      domEffects<-domEffects[segsnps2keep]
+      addEffects<-addEffects[segsnps2keep,]
+      domEffects<-domEffects[segsnps2keep,]
       # sire and dam LD matrices
       sireLD<-calcGameticLD(sireID,recombFreqMat,haploMat)
       damLD<-calcGameticLD(damID,recombFreqMat,haploMat)
@@ -312,15 +321,20 @@ predCrossVarAD<-function(sireID,damID,addEffects,domEffects,
       # predict dominance variance
       predDom<-t(domEffects)%*%(progenyLD)^2%*%domEffects
       totcomputetime<-proc.time()[3]-starttime
-      gcend<-gc()
+      gc() #gcend
       # output predicted add and dom vars for current family
       out<-tibble(varA=predAdd,
                   varD=predDom,
                   segsnps=list(segsnps2keep),
-                  StartGB=sum(gcbegin[,2])/1024,
-                  EndGB=sum(gcend[,2])/1024,
-                  MaxGB=sum(gcend[,6])/1024)
-      print(paste0("Variances predicted for family: ",sireID,"x",damID,"- took ",round(totcomputetime/60,2)," mins"))
+                  computetime=totcomputetime)
+      } else {
+            out<-tibble(varA=0,
+                        varD=0,
+                        segsnps=list(),
+                        computetime=0)
+      }
+
+      print(paste0("Variances predicted for family: ",sireID,"x",damID,"- took ",round(totcomputetime/60,3)," mins"))
       return(out)
 }
 
@@ -355,7 +369,8 @@ runCrossVarPredsAD<-function(outprefix=NULL,outpath=NULL,
                                                                addEffects=addEffects,
                                                                domEffects=domEffects,
                                                                haploMat=haploMat,
-                                                               recombFreqMat=recombFreqMat)))
+                                                               recombFreqMat=recombFreqMat))) %>%
+            tidyr::unnest(predVars)
       endtime<-proc.time()[3];
       print(paste0("Done predicting fam vars. ",
                    "Took ",round((endtime-timestart)/60,2),

@@ -19,9 +19,9 @@ predCrossVarAD(
 
 \item{damID}{string, Dam genotype ID. Needs to correspond to renames in haploMat}
 
-\item{addEffects}{vector of _additive_ SNP effects estimate. Ideally vector is named with SNP IDs and matches the order of related SNP matrices.}
+\item{addEffects}{column matrix of _additive_ SNP effects estimate with rownames == SNP_IDs and matches the order of related SNP matrices.}
 
-\item{domEffects}{vector of _dominance_ SNP effects estimate. Ideally vector is named with SNP IDs and matches the order of related SNP matrices.}
+\item{domEffects}{column matrix of _dominance_ SNP effects estimate with rownames == SNP_IDs and matches the order of related SNP matrices.}
 
 \item{haploMat}{matrix of phased haplotypes, 2 rows per sample, cols = loci, {0,1}, rownames assumed to contain GIDs with a suffix, separated by "_" to distinguish haplotypes}
 
@@ -34,4 +34,7 @@ a tibble with values for predicted add/dom variances as well as compute time and
 }
 \description{
 Function to predict the additive and dominance variances in a full-sibling family based on marker effects from a Additive+Dominance genome-wide SNP-BLUP model.
+}
+\details{
+SNP_IDs must match: names(addEffects)==names(domEffects)==colnames(haploMat)==rownames(recombFreqMat)==colnames(recombFreqMat).
 }

@@ -29,5 +29,6 @@ runMultiTraitCrossPredAD(
 
 }
 \description{
-runMultiTraitCrossPredAD
+For a set of crosses, with an array of posterior marker effects for multiple traits and a multi-component, namely an additive plus dominance model, predict the genetic means, (co)variances for all traits and all crosses.
+For prediction of variances, consider only segregating SNPs to save time and memory.
 }

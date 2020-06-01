@@ -2,7 +2,7 @@
 % Please edit documentation in R/predCrossVar.R
 \name{runMultiTraitCrossPredA}
 \alias{runMultiTraitCrossPredA}
-\title{runMultiTraitCrossPredAD}
+\title{runMultiTraitCrossPredA}
 \usage{
 runMultiTraitCrossPredA(
   outprefix = NULL,
@@ -28,5 +28,6 @@ runMultiTraitCrossPredA(
 
 }
 \description{
-runMultiTraitCrossPredAD
+For a set of crosses, with an array of posterior marker effects for multiple traits for a purely additive model, predict the genetic means, (co)variances for all traits and all crosses.
+For prediction of variances, consider only segregating SNPs to save time and memory.
 }

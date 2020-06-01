@@ -1038,3 +1038,217 @@ runMultiTraitCrossPredA<-function(outprefix=NULL,outpath=NULL,
    saveRDS(means_and_vars,file=here::here(outpath,paste0(outprefix,"_predMeansAndVars.rds")))
    return(means_and_vars)
 }
+
+
+
+#' runMultiTraitCrossPredADseqsnps
+#'
+#' Function is same as runMultiTraitCrossPredAD but for each family, when prediting variances, only considers segregating SNP.
+#' Makes a HUGE difference in compute speed / mem. usage. Eventually will become runMultiTraitCrossPredAD.
+#'
+#' @param outprefix
+#' @param outpath
+#' @param CrossesToPredict
+#' @param AddEffectArray
+#' @param DomEffectArray
+#' @param traits
+#' @param snpIDs
+#' @param nIter
+#' @param burnIn
+#' @param thin
+#' @param haploMat
+#' @param doseMat
+#' @param recombFreqMat
+#' @param ncores
+#' @param ...
+#'
+#' @return
+#' @export
+#'
+#' @examples
+runMultiTraitCrossPredADseqsnps<-function(outprefix=NULL,outpath=NULL,
+                                       CrossesToPredict,AddEffectArray, DomEffectArray,
+                                       traits, snpIDs, nIter, burnIn, thin,
+                                       haploMat,doseMat,recombFreqMat,ncores=1,...){
+   starttime<-proc.time()[3]
+   # Add dimnames
+   dimnames(AddEffectArray)[[2]]<-snpIDs
+   dimnames(AddEffectArray)[[3]]<-traits # t traits
+   dimnames(DomEffectArray)[[2]]<-snpIDs
+   dimnames(DomEffectArray)[[3]]<-traits # t traits
+
+   # Discard burnIn
+   AddEffectArray<-AddEffectArray[-c(1:burnIn/thin),,]
+   DomEffectArray<-DomEffectArray[-c(1:burnIn/thin),,]
+
+   # 3D arrays of effects to lists-of-matrices (by trait)
+   # Center posterior distribution of effects
+   ## on posterior mean across MCMC samples
+   AddEffectArray<-array_branch(AddEffectArray,3) %>%
+      map(.,~scale(.,center = T, scale = F))
+   DomEffectArray<-array_branch(DomEffectArray,3) %>%
+      map(.,~scale(.,center = T, scale = F))
+
+   ## Get the posterior mean effects vectors
+   postMeanAddEffects<-map(AddEffectArray,~attr(.,which = "scaled:center"))
+   postMeanDomEffects<-map(DomEffectArray,~attr(.,which = "scaled:center"))
+
+   # For each cross
+   ## Predict means for each trait
+   means<-tibble(Trait=traits)
+   parents<-CrossesToPredict %$% union(sireID,damID)
+   doseMat<-doseMat[parents,names(postMeanAddEffects[[1]])]
+   ## Mean Breeding Value
+   crossMeanBV<-function(Trait,CrossesToPredict,doseMat,postMeanAddEffects){
+      parentGEBVs<-doseMat%*%postMeanAddEffects[[Trait]]
+      predictedCrossMeanBVs<-CrossesToPredict %>%
+         left_join(tibble(sireID=rownames(parentGEBVs),sireGEBV=as.numeric(parentGEBVs))) %>%
+         left_join(tibble(damID=rownames(parentGEBVs),damGEBV=as.numeric(parentGEBVs))) %>%
+         mutate(predMeanBV=(sireGEBV+damGEBV)/2)
+      return(predictedCrossMeanBVs) }
+   means %<>% mutate(predMeanBVs=map(Trait,crossMeanBV,CrossesToPredict,doseMat,postMeanAddEffects))
+   ## Mean total genetic value
+   ## G = sum( pr(AA)*a-pr(aa)*a+pr(Aa)*d )
+   ### where A is counted allele in dosages
+   crossMeanGV<-function(Trait,CrossesToPredict,doseMat,postMeanAddEffects,postMeanDomEffects){
+      predictedCrossMeanGVs<-CrossesToPredict %>%
+         mutate(predMeanGV=map2_dbl(sireID,damID,
+                                    function(sireID,damID){
+                                       p1<-doseMat[sireID,]/2
+                                       p2<-doseMat[damID,]/2
+                                       q1<-1-p1
+                                       q2<-1-p2
+                                       gfreqs<-cbind(q1*q2,p1*q2+p2*q1,p1*p2)
+
+                                       meanG<-sum((gfreqs[,3]-gfreqs[,1])*postMeanAddEffects[[Trait]]+gfreqs[,2]*postMeanDomEffects[[Trait]])
+                                       return(meanG)
+                                    }))
+      return(predictedCrossMeanGVs) }
+   means %<>% mutate(predMeanGVs=map(Trait,crossMeanGV,CrossesToPredict,doseMat,postMeanAddEffects,postMeanDomEffects))
+   means %<>%
+      select(Trait,predMeanBVs) %>%
+      unnest(predMeanBVs) %>%
+      left_join(means %>%
+                   select(Trait,predMeanGVs) %>%
+                   unnest(predMeanGVs)) %>%
+      nest(predMeans=c(-Trait))
+
+   rm(doseMat); gc()
+
+   ## Predict trait (co)variances
+   varcovars<-bind_rows(tibble(Trait1=traits,Trait2=traits), # trait variances
+                        combn(traits,2,simplify = T) %>% # covariances
+                           t(.) %>% #
+                           `colnames<-`(.,c("Trait1","Trait2")) %>%
+                           as_tibble)
+
+   haploMat<-haploMat[sort(c(paste0(parents,"_HapA"),paste0(parents,"_HapB"))),snpIDs]
+
+   # function to do one var-covar param for all crosses
+   runCrossPMVarAD<-function(Trait1,Trait2,CrossesToPredict,
+                             AddEffectArray,DomEffectArray,
+                             haploMat,recombFreqMat,outpath,outprefix,
+                             postMeanAddEffects,postMeanDomEffects,ncores,...){
+
+      starttime<-proc.time()[3]
+      # Posterior Sample Variance-Covariance Matrix of Marker Effects
+      postVarCovarOfAddEffects<-(1/(nrow(AddEffectArray[[Trait1]])-1))*crossprod(AddEffectArray[[Trait1]],AddEffectArray[[Trait2]])
+      postVarCovarOfDomEffects<-(1/(nrow(DomEffectArray[[Trait1]])-1))*crossprod(DomEffectArray[[Trait1]],DomEffectArray[[Trait2]])
+
+      rm(AddEffectArray,DomEffectArray); gc()
+
+      # function to do one var-covar param for one cross
+      predCrossPMVarAD<-function(Trait1,Trait2,sireID,damID,
+                                 haploMat,recombFreqMat,
+                                 postMeanAddEffects,postMeanDomEffects,
+                                 postVarCovarOfAddEffects,postVarCovarOfDomEffects,...){
+         starttime<-proc.time()[3]
+
+         # Before predicting variances
+         # check for and remove SNPs that
+         # won't segregate, i.e. are fixed in parents
+         ### hopes to save time / mem
+         x<-colSums(rbind(haploMat[grep(paste0(sireID,"_"),rownames(haploMat)),],
+                          haploMat[grep(paste0(damID,"_"),rownames(haploMat)),]))
+         segsnps2keep<-names(x[x>0 & x<4])
+
+         if(length(segsnps2keep)>0){
+            recombFreqMat<-recombFreqMat[segsnps2keep,segsnps2keep]
+            haploMat<-haploMat[sort(c(paste0(parents,"_HapA"),paste0(parents,"_HapB"))),segsnps2keep]
+            postMeanAddEffects<-map(postMeanAddEffects,~.[segsnps2keep])
+            postMeanDomEffects<-map(postMeanDomEffects,~.[segsnps2keep])
+            postVarCovarOfAddEffects<-postVarCovarOfAddEffects[segsnps2keep,segsnps2keep]
+            postVarCovarOfDomEffects<-postVarCovarOfDomEffects[segsnps2keep,segsnps2keep]
+
+            # sire and dam LD matrices
+            sireLD<-calcGameticLD(sireID,recombFreqMat,haploMat)
+            damLD<-calcGameticLD(damID,recombFreqMat,haploMat)
+            progenyLD<-sireLD+damLD
+
+            rm(recombFreqMat,haploMat,sireLD,damLD); gc()
+
+            ## Additive
+            #### (Co)Variance of Posterior Means
+            vpm_m2a<-postMeanAddEffects[[Trait1]]%*%progenyLD%*%postMeanAddEffects[[Trait2]]
+            #### Posterior Mean (Co)Variance
+            pmv_m2a<-vpm_m2a+sum(diag(progenyLD%*%postVarCovarOfAddEffects))
+            ## Dominance
+            #### (Co)Variance of Posterior Means
+            progenyLDsq<-progenyLD^2
+            vpm_m2d<-postMeanAddEffects[[Trait1]]%*%progenyLDsq%*%postMeanAddEffects[[Trait2]]
+            #### Posterior Mean (Co)Variance
+            pmv_m2d<-vpm_m2d+sum(diag(progenyLDsq%*%postVarCovarOfAddEffects))
+            totcomputetime<-proc.time()[3]-starttime
+
+            rm(progenyLDsq,progenyLD); gc()
+
+            ## Tidy the results
+            out<-tibble(VarComp=c("VarA","VarD"),
+                        VPM=c(vpm_m2a,vpm_m2d),
+                        PMV=c(pmv_m2a,pmv_m2d),
+                        Nsegsnps=c(length(segsnps2keep),NA),
+                        totcomputetime=c(totcomputetime,NA))
+            print(paste0("Variances predicted for family: ",sireID,"x",damID,"- took ",round(totcomputetime/60,3)," mins"))
+         } else {
+            out<-tibble(VarComp=c("VarA","VarD"),
+                        VPM=c(0,0),
+                        PMV=c(0,0),
+                        Nsegsnps=c(0,0),
+                        computetime=c(0,0))
+            print(paste0("Variances predicted for family: ",sireID,"x",damID,"- had no segregating SNPs"))
+         }
+         return(out)
+      }
+      require(furrr); options(mc.cores=ncores); plan(multiprocess)
+      predictedfamvars<-CrossesToPredict %>%
+         dplyr::mutate(predVars=future_pmap(.,
+                                            predCrossPMVarAD,
+                                            Trait1=Trait1,Trait2=Trait2,
+                                            haploMat=haploMat,recombFreqMat=recombFreqMat,
+                                            postMeanAddEffects=postMeanAddEffects,
+                                            postMeanDomEffects=postMeanDomEffects,
+                                            postVarCovarOfAddEffects=postVarCovarOfAddEffects,
+                                            postVarCovarOfDomEffects=postVarCovarOfDomEffects))
+      totcomputetime<-proc.time()[3]-starttime
+      print(paste0("Done predicting fam vars. ",
+                   "Took ",round((totcomputetime)/60,2),
+                   " mins for ",nrow(predictedfamvars)," families"))
+      predictedfamvars<-list(predictedfamvars=predictedfamvars,totcomputetime=totcomputetime)
+      saveRDS(predictedfamvars,file=here::here(outpath,paste0(outprefix,"_Component",Trait1,"_",Trait2,".rds")))
+      return(predictedfamvars) }
+   starttime<-proc.time()[3]
+
+   varcovars %<>%
+      mutate(varcomps=pmap(.,runCrossPMVarAD,CrossesToPredict,
+                           AddEffectArray,DomEffectArray,
+                           haploMat,recombFreqMat,outpath,outprefix,
+                           postMeanAddEffects,postMeanDomEffects,ncores))
+   totcomputetime<-proc.time()[3]-starttime
+   means_and_vars<-list(means=means,
+                        varcovars=varcovars,
+                        totcomputetime=totcomputetime)
+
+   saveRDS(means_and_vars,file=here::here(outpath,paste0(outprefix,"_predMeansAndVars.rds")))
+   return(means_and_vars)
+}
+

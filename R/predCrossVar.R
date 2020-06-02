@@ -1067,13 +1067,11 @@ runMultiTraitCrossPredA<-function(outprefix=NULL,outpath=NULL,
       require(furrr); options(mc.cores=ncores); plan(multiprocess)
       predictedfamvars<-CrossesToPredict %>%
          dplyr::mutate(predVars=future_pmap(.,
-                                            predCrossPMVarAD,
+                                            predCrossPMVarA,
                                             Trait1=Trait1,Trait2=Trait2,
                                             haploMat=haploMat,recombFreqMat=recombFreqMat,
                                             postMeanAddEffects=postMeanAddEffects,
-                                            postMeanDomEffects=postMeanDomEffects,
-                                            postVarCovarOfAddEffects=postVarCovarOfAddEffects,
-                                            postVarCovarOfDomEffects=postVarCovarOfDomEffects))
+                                            postVarCovarOfAddEffects=postVarCovarOfAddEffects))
       totcomputetime<-proc.time()[3]-starttime
       print(paste0("Done predicting fam vars. ",
                    "Took ",round((totcomputetime)/60,2),

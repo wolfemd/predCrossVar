@@ -865,9 +865,9 @@ runMultiTraitCrossPredAD<-function(outprefix=NULL,outpath=NULL,
             ## Dominance
             #### (Co)Variance of Posterior Means
             progenyLDsq<-progenyLD^2
-            vpm_m2d<-postMeanAddEffects[[Trait1]]%*%progenyLDsq%*%postMeanAddEffects[[Trait2]]
+            vpm_m2d<-postMeanDomEffects[[Trait1]]%*%progenyLDsq%*%postMeanDomEffects[[Trait2]]
             #### Posterior Mean (Co)Variance
-            pmv_m2d<-vpm_m2d+sum(diag(progenyLDsq%*%postVarCovarOfAddEffects))
+            pmv_m2d<-vpm_m2d+sum(diag(progenyLDsq%*%postVarCovarOfDomEffects))
             totcomputetime<-proc.time()[3]-starttime
 
             rm(progenyLDsq,progenyLD); gc()

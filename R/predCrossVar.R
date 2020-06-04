@@ -597,9 +597,9 @@ multitraitPMV_AD<-function(AddEffectArray, DomEffectArray, traits,
       ## Dominance
       #### (Co)Variance of Posterior Means
       genoVarCovarMatSq<-genoVarCovarMat^2
-      vpm_m2d<-postMeanAddEffects[[Trait1]]%*%genoVarCovarMatSq%*%postMeanAddEffects[[Trait2]]
+      vpm_m2d<-postMeanDomEffects[[Trait1]]%*%genoVarCovarMatSq%*%postMeanDomEffects[[Trait2]]
       #### Posterior Mean (Co)Variance
-      effects_uncertainty_m2d<-sum(diag(genoVarCovarMatSq%*%postVarCovarOfAddEffects))
+      effects_uncertainty_m2d<-sum(diag(genoVarCovarMatSq%*%postVarCovarOfDomEffects))
       pmv_m2d<-vpm_m2d+effects_uncertainty_m2d
 
       # Tidy the results

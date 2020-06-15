@@ -1,10 +1,10 @@
 Package: predCrossVar
 Type: Package
-Title: Package for predicting (outbred) genomic variances in full-sib crosses.
+Title: Package for multi-trait prediction of genomic variances and covariances in (outbred) full-sib crosses.
 Version: 0.1.0
 Author: Marnin D. Wolfe, Ph.D.
 Maintainer: The package maintainer <wolfemd@gmail.com>
-Description: A complete set of functions to support the estimation of genetic variance based on marker effects, potentially accounting for LD. Supports both additive and dominance variances. Built for _outbred_ organisms with phased marker data. 
+Description: A complete set of functions to predict genetic variances in full-sib crosses. Supports the estimation of genetic variance based on marker effects, potentially accounting for LD. Supports both additive and dominance variances. Built for _outbred_ organisms with phased marker data. 
 License: GPL-3
 Encoding: UTF-8
 LazyData: true

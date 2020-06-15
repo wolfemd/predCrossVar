@@ -1,452 +1,614 @@
-#' kinship function
+
+#' effectsArray2list
 #'
-#' Function to create additive and dominance genomic relationship matrices from biallelic dosages.
+#' Converts an array of posterior samples of multi-trait marker effects to a named list (one for each trait).
 #'
-#' @param M dosage matrix. Assumes SNPs in M coded 0, 1, 2 (requires rounding dosages to integers). M is Nind x Mrow, numeric matrix, with row/columanes to indicate SNP/ind ID.
-#' @param type string, "add" or "dom". type="add" gives same as rrBLUP::A.mat(), i.e. Van Raden, Method 1. type="dom" gives classical parameterization according to Vitezica et al. 2013.
+#' @param effectsArray According to BGLR documentation: 3D array, with dim=c(nRow,p,traits), where nRow number of MCMC samples saved, p is the number of predictors and traits is the number of traits. BGLR::Multitrait() writes a binary file to disk when saveEffects=TRUE is specified. It can be read to R with BGLR::readBinMatMultitrait().
+#' @param snpIDs character vector with labels for the predictors (SNPs), numeric should work too, but untested.
+#' @param traits character vector to label the traits.
+#' @param nIter number of iterations used for MCMC; used internally only to exclude burn-in samples from computation
+#' @param burnIn burnIn for MCMC; used internally only to exclude burn-in samples from computation
+#' @param thin thin for MCMC; used internally only to exclude burn-in samples from computation
 #'
-#' @return square symmetic genomic relationship matrix
+#' @return list of matrices, one matrix per trait, each matrix has `nrow((nIter-burnIn)/thin)` and `ncol(length(snpIDs))`. Each element of the list is named with a string identifying the trait and the colnames of each matrix are labelled with snpIDs.
 #' @export
 #'
 #' @examples
-#' K<-kinship(M,"add")
-kinship<-function(M,type){
-      M<-round(M)
-      freq <- colMeans(M,na.rm=T)/2
-      P <- matrix(rep(freq,nrow(M)),byrow=T,ncol=ncol(M))
-      if(type=="add"){
-            Z <- M-2*P
-            varD<-sum(2*freq*(1-freq))
-            K <- tcrossprod(Z)/ varD
-            return(K)
-      }
-      if(type=="dom"){
-            W<-M;
-            W[which(W==1)]<-2*P[which(W==1)];
-            W[which(W==2)]<-(4*P[which(W==2)]-2);
-            W <- W-2*(P^2)
-            varD<-sum((2*freq*(1-freq))^2)
-            D <- tcrossprod(W) / varD
-            return(D)
-      }
+#' effectsArray<-BGLR::readBinMatMultitrait(filename = "mt_effects_ETA_g_beta.bin")
+#' effectsArray<-effectsArray2list(effectsArray, snpIDs, traits, nIter, burnIn, thin)
+#'
+effectsArray2list<-function(effectsArray, snpIDs, traits, nIter, burnIn, thin){
+   # Discard burnIn
+   effectsArray<-effectsArray[-c(1:burnIn/thin),,]
+   # Add dimnames
+   dimnames(effectsArray)[[2]]<-snpIDs
+   dimnames(effectsArray)[[3]]<-traits
+   # 3D arrays of effects to lists-of-matrices (by trait)
+   effectsArray<-purrr::array_branch(effectsArray,3)
+   return(effectsArray)
 }
 
-#' makeKinship function
+#' posteriorMeanVarCovarA
 #'
-#' function to create a additive or dominance kinship matrix from a AlphaSimR pop-class object. A wrapper for the kinship() function.
+#' For an additive only model, compute multiple types of genomic estimator for a single variance or covariance component.
+#' Posterior mean variance or co-variance (PMV) and also the variance of posterior means (VPM) estimators are returned.
+#' Both M1, i.e. "Method 1", which does not account for LD in the population and M2 or "Method 2", which does, are returned.
 #'
-#' @param pop pop-class object from AlphaSimR
-#' @param SP simulation parameters from AlphaSimR
-#' @param type string, "add" or "dom". type="add" gives same as rrBLUP::A.mat(), i.e. Van Raden, Method 1. type="dom" gives classical parameterization according to Vitezica et al. 2013.
-#' @param snpsORqtl string, "snps" (default) or "qtl". Determines which loci are used to compute the GRM.
+#' @param Trait1 string, label for Trait1. When Trait1==Trait2 computes the genomic variance of the trait, when Trait1!=Trait2 computes the genomic covariance between traits.
+#' @param Trait2  string, label for Trait2. When Trait1==Trait2 computes the genomic variance of the trait, when Trait1!=Trait2 computes the genomic covariance between traits.
+#' @param AddEffectList list of ADDITIVE effect matrices, one matrix per trait, Each element of the list is named with a string identifying the trait and the colnames of each matrix are labelled with snpIDs.
+#' @param postMeanAddEffects list of named vectors (or column matrices) with the posterior mean ADDITIVE marker effects.
+#' @param genoVarCovarMat variance-covariance matrix of marker genotypes, i.e. measuring linkage disequilibrium
 #'
-#' @return
+#' @return tibble with estimators for one variance or co-variance parameter.
 #' @export
 #'
 #' @examples
-#'  K<-makeKinship(pop, SP, type="add")
-#'
-makeKinship<-function(pop, SP, type, snpsORqtl="snps"){
-      if(snpsORqtl=="snps"){
-            M<-pullSnpGeno(pop=pop, simParam=SP) }
-      if(snpsORqtl=="qtl"){
-            M<-pullQtlGeno(pop=pop, simParam=SP) }
-      grm<-kinship(M=M,type=type)
-      return(grm)
-}
+posteriorMeanVarCovarA<-function(Trait1,Trait2,
+                                 AddEffectList,postMeanAddEffects,genoVarCovarMat){
 
-#' centerDosage
-#'
-#' Centers dosage matrix, e.g. for use in whole-genome regressions like rrBLUP
-#'
-#' @param M dosage matrix. Assumes SNPs in M coded 0, 1, 2 (requires rounding dosages to integers). M is Nind x Mrow, numeric matrix, with row/columanes to indicate SNP/ind ID
-#'
-#'
-#' @return
-#' @export
-#'
-#' @examples
-#' centeredM<-centerDosage(M)
-centerDosage<-function(M){
-      freq <- colMeans(M,na.rm=T)/2
-      P <- matrix(rep(freq,nrow(M)),byrow=T,ncol=ncol(M))
-      Z <- M-2*P
-      return(Z)
-}
+   # Posterior Sample Variance-Covariance Matrix of Marker Effects
+   postVarCovarOfAddEffects<-(1/(nrow(AddEffectList[[Trait1]])-1))*crossprod(AddEffectList[[Trait1]],AddEffectList[[Trait2]])
 
-#' dose2domDev
-#'
-#' Converts a dosage matrix into a matrix of centered dominance deviations
-#'
-#' @param M dosage matrix. Assumes SNPs in M coded 0, 1, 2 (requires rounding dosages to integers). M is Nind x Mrow, numeric matrix, with row/columanes to indicate SNP/ind ID
-#'
-#' @return
-#' @export
-#'
-#' @examples
-#' domDev<-dose2domDev(M)
-dose2domDev<-function(M){
-      freq <- colMeans(M,na.rm=T)/2
-      P <- matrix(rep(freq,nrow(M)),byrow=T,ncol=ncol(M))
-      W<-M;
-      W[which(W==1)]<-2*P[which(W==1)];
-      W[which(W==2)]<-(4*P[which(W==2)]-2);
-      W <- W-2*(P^2)
-      return(W)
-}
+   # Method 1 (Unconditional, Not accounting for LD)
+   ## Additive
+   #### (Co)Variance of Posterior Means
+   vpm_m1a<-sum(diag(genoVarCovarMat)*(postMeanAddEffects[[Trait1]]*postMeanAddEffects[[Trait2]]))
+   #### Posterior Mean (Co)Variance
+   pmv_m1a<-vpm_m1a+sum(diag(postVarCovarOfAddEffects)*diag(genoVarCovarMat))
 
-#' getAF
-#'
-#' get a vector of allele frequences from a dosage matrix
-#'
-#' @param M dosage matrix. Assumes SNPs in M coded 0, 1, 2 (requires rounding dosages to integers). M is Nind x Mrow, numeric matrix, with row/columanes to indicate SNP/ind ID
-#'
-#' @return vector of allele frequencies, names = SNP IDs if in cols of M
-#' @export
-#'
-#' @examples
-getAF<-function(M){ colMeans(M,na.rm=T)/2 }
+   # Method 2 (Conditioned on LD)
+   ## Additive
+   #### (Co)Variance of Posterior Means
+   vpm_m2a<-postMeanAddEffects[[Trait1]]%*%genoVarCovarMat%*%postMeanAddEffects[[Trait2]]
+   #### Posterior Mean (Co)Variance
+   pmv_m2a<-vpm_m2a+sum(diag(genoVarCovarMat%*%postVarCovarOfAddEffects))
 
-#' getMAF
-#'
-#' get a vector of _minor_ allele frequences from a dosage matrix
-#'
-#' @param M dosage matrix. Assumes SNPs in M coded 0, 1, 2 (requires rounding dosages to integers). M is Nind x Mrow, numeric matrix, with row/columanes to indicate SNP/ind ID
-#'
-#' @return vector of _minor_ allele frequencies, names = SNP IDs if in cols of M
-#' @export
-#'
-#' @examples
-getMAF<-function(M){
-      freq<-colMeans(M, na.rm=T)/2; maf<-freq;
-      maf[which(maf > 0.5)]<-1-maf[which(maf > 0.5)]
-      return(maf) }
-
-#' maf_filter
-#'
-#' filter a dosage matrix by minor allele frequence.
-#' get a vector of allele frequences from a dosage matrix
-#'
-#' @param M dosage matrix. Assumes SNPs in M coded 0, 1, 2 (requires rounding dosages to integers). M is Nind x Mrow, numeric matrix, with row/columanes to indicate SNP/ind ID
-#' @param thresh threshold value. Columns of M with maf<thresh will be removed
-#' @return dosage matrix potentially with columns removed
-#' @export
-#'
-#' @examples
-maf_filter<-function(M,thresh){
-      freq<-colMeans(M, na.rm=T)/2; maf<-freq;
-      maf[which(maf > 0.5)]<-1-maf[which(maf > 0.5)]
-      snps1<-M[,which(maf>thresh)];
-      return(snps1) }
-
-#' remove_invariant
-#'
-#' filter a dosage matrix, removing invariant markers. Removes e.g. cases where MAF=0.5 but all dosages == 1 (het).
-#'
-#' @param M dosage matrix. Assumes SNPs in M coded 0, 1, 2 (requires rounding dosages to integers). M is Nind x Mrow, numeric matrix, with row/columanes to indicate SNP/ind ID
-#' @param thresh threshold value. Columns of M with maf<thresh will be removed
-#' @return dosage matrix potentially with columns removed
-#' @export
-#'
-#' @examples
-remove_invariant<-function(M){
-      snps1<-M[ ,apply(M, 2, var) != 0]
-      return(snps1) }
-
-#' genomicVarA_m1
-#'
-#' Compute standard genomic variance term, what Lehermeier called Method 1 or "M1".
-#' LD is not accounted for. SNP effects are assumed _i.i.d._.
-#'
-#' @param snpVarA vector of _additive_ SNP effects estimate. Ideally vector is named with SNP IDs and matches the order of related SNP matrices.
-#' @param freq vector of allele frequencies. Must be in same order as snp effects
-#' @return additive genomic variance component
-#' @export
-#'
-#' @examples
-genomicVarA_m1<-function(snpVarA,freq){
-      sum((2*freq*(1-freq)))*snpVarA
-}
-
-#' genomicVarD_m1
-#'
-#' Compute standard genomic variance term, what Lehermeier called Method 1 or "M1".
-#' LD is not accounted for. SNP effects are assumed _i.i.d._.
-#'
-#' @param snpVarD vector of _dominance_ SNP effects estimate. Ideally vector is named with SNP IDs and matches the order of related SNP matrices.
-#' @param freq vector of allele frequencies. Must be in same order as snp effects
-#' @return additive genomic variance component
-#' @export
-#'
-#' @examples
-genomicVarD_m1<-function(snpVarD,freq){
-      sum((2*freq*(1-freq))^2)*snpVarD
-}
-
-#' genoVarCovarMatFunc
-#'
-#' Compute the *p SNPs*-by-*p SNPs* variance-covariance matrix of SNP dosages.
-#' This is an estimator of the LD between loci within a given population.
-#'
-#' @param Z column-centered matrix of SNP dosages. Assumes SNPs in Z were originally coded 0, 1, 2 were column centered.
-#'
-#' @return
-#'  NOTE: this matrix is going to be big in practice.
-#'  The *p SNPs*-by-*p SNPs* variance-covariance matrix of SNP dosages.
-#'  may be worth computing in an R session using multi-threaded BLAS
-#' @export
-#'
-#' @examples
-#' Z<-centerDosage(M)
-#' genoVarCovarMat<-genoVarCovarMatFunc(Z)
-genoVarCovarMatFunc<-function(Z){
-      SigmaM<-1/nrow(Z)*t(Z)%*%Z
-      return(SigmaM)
+   # Tidy the results
+   out<-bind_rows(tibble(VarComp=c("VarA"),
+                         Method=c("M1"),
+                         VPM=c(vpm_m1a), # NOTE: unsure relevance of "VPM" for Method 1, suggest ignoring
+                         PMV=c(pmv_m1a)), #### PMV for Method 1 matches the standard VarComps you would get from BGLR
+                  tibble(VarComp=c("VarA"),
+                         Method=c("M2"),
+                         VPM=c(vpm_m2a),
+                         PMV=c(pmv_m2a)))
+   return(out)
 }
 
 
-#' getM2varcomp
+
+#' posteriorMeanVarCovarAD
 #'
-#' Computes the genomic variance component accounting account for linkage disequilibrium, which Lehermeier called Method 2 or "M2".
+#' For an additive plus dominance model, compute multiple types of genomic estimator for a single variance or covariance component.
+#' Posterior mean variance or co-variance (PMV) and also the variance of posterior means (VPM) estimators are returned.
+#' Both M1, i.e. "Method 1", which does not account for LD in the population and M2 or "Method 2", which does, are returned.
+#' Additive and dominance variances/covariances are returned.
 #'
-#' @param effects vector of SNP effects
-#' @param varcovarmat square, symmetric var-covar matrix, estimator of LD between loci
-#' @param type string, "add" or "dom". If "dom" will square varcovarmat to get correct varcomp.
+#' @param Trait1 string, label for Trait1. When Trait1==Trait2 computes the genomic variance of the trait, when Trait1!=Trait2 computes the genomic covariance between traits.
+#' @param Trait2 string, label for Trait2. When Trait1==Trait2 computes the genomic variance of the trait, when Trait1!=Trait2 computes the genomic covariance between traits.
+#' @param AddEffectList list of ADDITIVE effect matrices, one matrix per trait, Each element of the list is named with a string identifying the trait and the colnames of each matrix are labelled with snpIDs.
+#' @param DomEffectList list of DOMINANCE effect matrices, one matrix per trait, Each element of the list is named with a string identifying the trait and the colnames of each matrix are labelled with snpIDs.
+#' @param postMeanAddEffects list of named vectors (or column matrices) with the posterior mean ADDITIVE marker effects.
+#' @param postMeanDomEffects list of named vectors (or column matrices) with the posterior mean DOMINANCE marker effects.
+#' @param genoVarCovarMat variance-covariance matrix of marker genotypes, i.e. measuring linkage disequilibrium
 #'
-#' @details Make sure **effects** and **varcovarmat** are in same order.
-#' This might use _alot_ of RAM and take _alot_ of time as it involves very large matrix operations.
-#' May be worth computing in an R session using multi-threaded BLAS
-#' @return additive or dominance genomic variance estimate accounting account for linkage disequilibrium
+#' @return tibble with estimators for one variance or co-variance parameter including both additive and dominance components.
 #' @export
 #'
 #' @examples
-#' Z<-centerDosage(M)
-#' varcovarmat<-genoVarCovarMatFunc(Z)
-#' VarAddM2<-getM2varcomp(effects,varcovarmat,"add")
-getM2varcomp<-function(effects,varcovarmat,type){
-      if(type=="dom"){ varcovarmat<-varcovarmat^2 }
-      vgM2<-t(effects)%*%varcovarmat%*%effects
-      return(vgM2)
+posteriorMeanVarCovarAD<-function(Trait1,Trait2,
+                                  AddEffectList,DomEffectList,
+                                  postMeanAddEffects,postMeanDomEffects,
+                                  genoVarCovarMat){
+
+   # Posterior Sample Variance-Covariance Matrix of Marker Effects
+   postVarCovarOfAddEffects<-(1/(nrow(AddEffectList[[Trait1]])-1))*crossprod(AddEffectList[[Trait1]],AddEffectList[[Trait2]])
+   postVarCovarOfDomEffects<-(1/(nrow(DomEffectList[[Trait1]])-1))*crossprod(DomEffectList[[Trait1]],DomEffectList[[Trait2]])
+
+   # Method 1 (Unconditional, Not accounting for LD)
+   ## Additive
+   #### (Co)Variance of Posterior Means
+   vpm_m1a<-sum(diag(genoVarCovarMat)*(postMeanAddEffects[[Trait1]]*postMeanAddEffects[[Trait2]]))
+   #### Posterior Mean (Co)Variance
+   pmv_m1a<-vpm_m1a+sum(diag(postVarCovarOfAddEffects)*diag(genoVarCovarMat))
+   ## Dominance
+   #### (Co)Variance of Posterior Means
+   vpm_m1d<-sum(diag(genoVarCovarMat)^2*(postMeanDomEffects[[Trait1]]*postMeanDomEffects[[Trait2]]))
+   #### Posterior Mean (Co)Variance
+   pmv_m1d<-vpm_m1d+sum(diag(postVarCovarOfDomEffects)*(diag(genoVarCovarMat)^2))
+
+   # Method 2 (Conditioned on LD)
+   ## Additive
+   #### (Co)Variance of Posterior Means
+   vpm_m2a<-postMeanAddEffects[[Trait1]]%*%genoVarCovarMat%*%postMeanAddEffects[[Trait2]]
+   #### Posterior Mean (Co)Variance
+   pmv_m2a<-vpm_m2a+sum(diag(genoVarCovarMat%*%postVarCovarOfAddEffects))
+   ## Dominance
+   #### (Co)Variance of Posterior Means
+   genoVarCovarMatSq<-genoVarCovarMat^2
+   vpm_m2d<-postMeanDomEffects[[Trait1]]%*%genoVarCovarMatSq%*%postMeanDomEffects[[Trait2]]
+   #### Posterior Mean (Co)Variance
+   pmv_m2d<-vpm_m2d+sum(diag(genoVarCovarMatSq%*%postVarCovarOfDomEffects))
+
+   # Tidy the results
+   out<-bind_rows(tibble(VarComp=c("VarA","VarD"),
+                         Method=c("M1","M1"),
+                         VPM=c(vpm_m1a,vpm_m1d), # NOTE: unsure relevance of "VPM" for Method 1, suggest ignoring
+                         PMV=c(pmv_m1a,pmv_m1d)), #### PMV for Method 1 matches the standard VarComps you would get from BGLR
+                  tibble(VarComp=c("VarA","VarD"),
+                         Method=c("M2","M2"),
+                         VPM=c(vpm_m2a,vpm_m2d),
+                         PMV=c(pmv_m2a,pmv_m2d)))
+   return(out)
 }
 
-#' genmap2recombfreq
+#' getMultiTraitPMVs_A
 #'
-#' Compute the pairwise recombination frequencies between all loci from genetic map positions.
+#' For an additive only model, compute _all pairwise_ variance and co-variance parameters from the post-burn-In, thinned samples of marker effects obtained using an Bayesian multi-trait model fit to some current population.
+#' Wraps `posteriorMeanVarCovarA()` over all trait variances and co-variances.
+#' Posterior mean variance or co-variance (PMV) and also the variance of posterior means (VPM) estimators are returned.
+#' Both M1, i.e. "Method 1", which does not account for LD in the population and M2 or "Method 2", which does, are returned.
 #'
-#' @param m vector of centiMorgan-scale genetic positions. names(m) correspond to a SNP_ID. Since m potentially contains all chromosomes, sets recomb. freq. b/t chrom. to 0.5
-#' @param nChr number of chromosomes
+#' @param AddEffectList list of ADDITIVE effect matrices, one matrix per trait, Each element of the list is named with a string identifying the trait and the colnames of each matrix are labelled with snpIDs.
+#' @param genoVarCovarMat variance-covariance matrix of marker genotypes, i.e. measuring linkage disequilibrium
 #'
-#' @details names(m) must be formatted as "chr"_"id" with "chr" being integer. For example: 2_QTL1 for a locus on chr. 2.
-#' May be worth computing in an R session using multi-threaded BLAS.
-#' @return potentially really large matrix of pairwise recombination frequencies between loci
+#' @return tibble with estimators for all pairwise variance and co-variance parameters.
 #' @export
 #'
 #' @examples
-genmap2recombfreq<-function(m,nChr){
-      d<-as.matrix(dist(m,upper=T,diag = T,method='manhattan'))
-      c1<-0.5*(1-exp(-2*d))
-      # Since m contains all chromosomes, set recomb. freq. b/t chrom. to 0.5
-      for(i in 1:nChr){
-            c1[grepl(paste0("^",i,"_"),rownames(c1)),!grepl(paste0("^",i,"_"),colnames(c1))]<-0.5
-            c1[!grepl(paste0("^",i,"_"),rownames(c1)),grepl(paste0("^",i,"_"),colnames(c1))]<-0.5
-      }
-      return(c1)
+getMultiTraitPMVs_A<-function(AddEffectList, genoVarCovarMat){
+   traits<-names(AddEffectList)
+   # Center posterior distribution of effects
+   ## on posterior mean across MCMC samples
+   AddEffectList %<>% map(.,~scale(.,center = T, scale = F))
+
+   ## Get the posterior mean effects vectors
+   postMeanAddEffects<-map(AddEffectList,~attr(.,which = "scaled:center"))
+
+   # Make tibble of pairwise variance parameters to compute
+   ## Include trait-trait variances, avoid duplicating covariances
+   ## i.e. lower triangle including diagonals of var-covar matrix
+   varcovars<-bind_rows(tibble(Trait1=traits,Trait2=traits), # trait variances
+                        combn(traits,2,simplify = T) %>% # covariances
+                           t(.) %>% #
+                           `colnames<-`(.,c("Trait1","Trait2")) %>%
+                           as_tibble)
+
+   # Compute over each variance parameter
+   varcovars %<>%
+      mutate(varcomps=pmap(.,posteriorMeanVarCovarA,AddEffectList,postMeanAddEffects)) %>%
+      unnest(varcomps)
+   return(varcovars)
 }
 
-#' calcGameticLD
+
+#' getMultiTraitPMVs_AD
 #'
-#' Function to compute gametic LD matrix for a single parent. Uses a matrix of recombination frequencies and the supplied haplotypes of the parent as in Bijma et al. 2020 and Lehermeier et al. 2017b (and others).
+#' For an additive plus dominance model, compute _all pairwise_ variance and co-variance parameters from the post-burn-In, thinned samples of marker effects obtained using an Bayesian multi-trait model fit to some current population.
+#' Wraps `posteriorMeanVarCovarAD()` over all trait variances and co-variances.
+#' Posterior mean variance or co-variance (PMV) and also the variance of posterior means (VPM) estimators are returned.
+#' Both M1, i.e. "Method 1", which does not account for LD in the population and M2 or "Method 2", which does, are returned.
+#' Additive and dominance variances/covariances are returned.
 #'
-#' @param parentGID string, the GID of an individual. Needs to correspond to renames in haploMat
-#' @param recombFreqMat a square symmetric matrix with values = (1-2*c1), where c1=matrix of expected recomb. frequencies. The choice to do 1-2c1 outside the function was made for computation efficiency; every operation on a big matrix takes time.
-#' @param haploMat matrix of phased haplotypes, 2 rows per sample, cols = loci, {0,1}, rownames assumed to contain GIDs with a suffix, separated by "_" to distinguish haplotypes
+#' @param AddEffectList list of ADDITIVE effect matrices, one matrix per trait, Each element of the list is named with a string identifying the trait and the colnames of each matrix are labelled with snpIDs.
+#' @param DomEffectList list of DOMINANCE effect matrices, one matrix per trait, Each element of the list is named with a string identifying the trait and the colnames of each matrix are labelled with snpIDs.
+#' @param genoVarCovarMat variance-covariance matrix of marker genotypes, i.e. measuring linkage disequilibrium
 #'
-#' @details Columns of haploMat and row/cols of recombFreqMat should be in same order. May be worth computing in an R session using multi-threaded BLAS.
-#' @return Potentially really large matrix representing the LD between loci in gametes
+#' @return tibble with estimators for all pairwise variance and co-variance parameters including both additive and dominance components.
 #' @export
 #'
 #' @examples
-calcGameticLD<-function(parentGID,recombFreqMat,haploMat){
-      X<-haploMat[grep(paste0(parentGID,"_"),rownames(haploMat)),,drop=F]
-      ### drop=F safegaurds against matrix->vector conversion if only 1 seg. locus (column)
-      # Equiv versions (in case another is more efficient)
-      # Version1
-      D<-recombFreqMat*((0.5*crossprod(X))-tcrossprod(colMeans(X)))
-      # Version2
-      # p<-colMeans(X)
-      # D<-recombFreqMat*((0.5*t(X)%*%X)-p%*%t(p))
-      # Version3
-      # D<-recombFreqMat*(crossprod(scale(X,scale = F))/2)
-      return(D)
+getMultiTraitPMVs_AD<-function(AddEffectList, DomEffectList, genoVarCovarMat){
+   traits<-names(AddEffectList)
+   # Center posterior distribution of effects
+   ## on posterior mean across MCMC samples
+   AddEffectList %<>% map(.,~scale(.,center = T, scale = F))
+   DomEffectList %<>% map(.,~scale(.,center = T, scale = F))
+
+   ## Get the posterior mean effects vectors
+   postMeanAddEffects<-map(AddEffectList,~attr(.,which = "scaled:center"))
+   postMeanDomEffects<-map(DomEffectList,~attr(.,which = "scaled:center"))
+
+   # Make tibble of pairwise variance parameters to compute
+   ## Include trait-trait variances, avoid duplicating covariances
+   ## i.e. lower triangle including diagonals of var-covar matrix
+   varcovars<-bind_rows(tibble(Trait1=traits,Trait2=traits), # trait variances
+                        combn(traits,2,simplify = T) %>% # covariances
+                           t(.) %>% #
+                           `colnames<-`(.,c("Trait1","Trait2")) %>%
+                           as_tibble)
+
+   # Compute over each variance parameter
+    varcovars %<>%
+      mutate(varcomps=pmap(.,posteriorMeanVarCovarAD,AddEffectList,DomEffectList,postMeanAddEffects,postMeanDomEffects)) %>%
+      unnest(varcomps)
+   return(varcovars)
 }
 
-#' predCrossVarA function
+#' predCrossMeanBVsOneTrait
 #'
-#' Function to predict the additive and dominance variances in a full-sibling family based on marker effects from a Additive+Dominance genome-wide SNP-BLUP model.
+#' Predict the mean breeding value of each family, for a single trait, given parental allelic dosages and (posterior mean) marker effects.
+#' Should from an additive-only model.
 #'
+#' @param Trait string, label of trait (name in list of postMeanAddEffects) to compute
+#' @param CrossesToPredict data.frame or tibble, col/colnames: sireID, damID. sireID and damID must both be in the haploMat.
+#' @param doseMat dosage matrix. Assumes SNPs in M coded 0, 1, 2 (requires rounding dosages to integers). M is Nind x Mrow, numeric matrix, with row/colnames to indicate SNP/ind ID
+#' @param postMeanAddEffects list of named vectors (or column matrices) with the posterior mean ADDITIVE marker effects.
+#'
+#' @return tibble with parental GEBV and the pred Mean GEBV (mean of parents) for each cross.
+#' @export
+#'
+#' @examples
+predCrossMeanBVsOneTrait<-function(Trait,CrossesToPredict,doseMat,postMeanAddEffects){
+   parentGEBVs<-doseMat%*%postMeanAddEffects[[Trait]]
+   predictedCrossMeanBVs<-CrossesToPredict %>%
+      left_join(tibble(sireID=rownames(parentGEBVs),sireGEBV=as.numeric(parentGEBVs))) %>%
+      left_join(tibble(damID=rownames(parentGEBVs),damGEBV=as.numeric(parentGEBVs))) %>%
+      mutate(predMeanBV=(sireGEBV+damGEBV)/2)
+   return(predictedCrossMeanBVs)
+}
+
+#' predCrossMeanGVsOneTrait
+#'
+#' Predict the total genetic merit of the cross based on a model with additive+dominance marker effects.
+#' For each family , for a single trait, given  parental allelic dosages and (posterior mean) marker effects.
+#' G = sum( pr(AA)*a-pr(aa)*a+pr(Aa)*d ), where A is counted allele in dosages
+#'
+#' @param Trait string, label of trait (name in list of postMeanAddEffects) to compute
+#' @param CrossesToPredict data.frame or tibble, col/colnames: sireID, damID. sireID and damID must both be in the haploMat.
+#' @param doseMat dosage matrix. Assumes SNPs in M coded 0, 1, 2 (requires rounding dosages to integers). M is Nind x Mrow, numeric matrix, with row/colnames to indicate SNP/ind ID
+#' @param postMeanAddEffects list of named vectors (or column matrices) with the posterior mean ADDITIVE marker effects.
+#' @param postMeanDomEffects list of named vectors (or column matrices) with the posterior mean DOMINANCE marker effects.
+#'
+#' @return tibble with predicted mean GV for each family
+#' @export
+#'
+#' @examples
+predCrossMeanGVsOneTrait<-function(Trait,CrossesToPredict,doseMat,postMeanAddEffects,postMeanDomEffects){
+   predictedCrossMeanGVs<-CrossesToPredict %>%
+      mutate(predMeanGV=map2_dbl(sireID,damID,
+                                 function(sireID,damID){
+                                    p1<-doseMat[sireID,]/2
+                                    p2<-doseMat[damID,]/2
+                                    q1<-1-p1
+                                    q2<-1-p2
+                                    gfreqs<-cbind(q1*q2,p1*q2+p2*q1,p1*p2)
+
+                                    meanG<-sum((gfreqs[,3]-gfreqs[,1])*postMeanAddEffects[[Trait]]+gfreqs[,2]*postMeanDomEffects[[Trait]])
+                                    return(meanG)
+                                 }))
+   return(predictedCrossMeanGVs) }
+
+#' predCrossMeansA
+#'
+#' From an additive only model, fit to multiple traits, predict the mean (breeding value) of each cross for each trait.
+#' Corresponds to the mean GEBV of the parents, given  parental allelic dosages and (posterior mean) marker effects.
+#'
+#' @param CrossesToPredict data.frame or tibble, col/colnames: sireID, damID. sireID and damID must both be in the haploMat.
+#' @param postMeanAddEffects list of named vectors (or column matrices) with the posterior mean ADDITIVE marker effects.
+#' @param doseMat dosage matrix. Assumes SNPs in M coded 0, 1, 2 (requires rounding dosages to integers). M is Nind x Mrow, numeric matrix, with row/colnames to indicate SNP/ind ID
+#'
+#' @return tibble with predicted mean BV for each trait in each family
+#' @export
+#'
+#' @examples
+predCrossMeansA<-function(CrossesToPredict,postMeanAddEffects,doseMat){
+   means<-tibble(Trait=names(postMeanAddEffects))
+   parents<-CrossesToPredict %$% union(sireID,damID)
+   doseMat<-doseMat[parents,names(postMeanAddEffects[[1]])]
+   ## Predicted Mean Total Merit
+   means %<>%
+      mutate(predMeanBVs=map(Trait,predCrossMeanBVsOneTrait,CrossesToPredict,doseMat,postMeanAddEffects)) %>%
+      select(Trait,predMeanBVs) %>%
+      unnest(predMeanBVs)
+   return(means) }
+
+#' predCrossMeansAD
+#'
+#' From an additive+dominance model, fit to multiple traits, predict the total genetic merit of each cross for each trait.
+#' For each family , for a single trait, given  parental allelic dosages and (posterior mean) marker effects.
+#' G = sum( pr(AA)*a-pr(aa)*a+pr(Aa)*d ), where A is counted allele in dosages
+#'
+#' @param CrossesToPredict data.frame or tibble, col/colnames: sireID, damID. sireID and damID must both be in the haploMat.
+#' @param postMeanAddEffects list of named vectors (or column matrices) with the posterior mean ADDITIVE marker effects.
+#' @param postMeanDomEffects list of named vectors (or column matrices) with the posterior mean DOMINANCE marker effects.
+#' @param doseMat dosage matrix. Assumes SNPs in M coded 0, 1, 2 (requires rounding dosages to integers). M is Nind x Mrow, numeric matrix, with row/colnames to indicate SNP/ind ID
+#'
+#' @return tibble with predicted mean GV for each trait in each family
+#' @export
+#'
+#' @examples
+predCrossMeansAD<-function(CrossesToPredict,postMeanAddEffects,postMeanDomEffects,doseMat){
+   means<-tibble(Trait=names(postMeanAddEffects))
+   parents<-CrossesToPredict %$% union(sireID,damID)
+   doseMat<-doseMat[parents,names(postMeanAddEffects[[1]])]
+   ## Predicted Mean Total Merit
+   means %<>%
+      mutate(predMeanGVs=map(Trait,predCrossMeanGVsOneTrait,CrossesToPredict,doseMat,postMeanAddEffects,postMeanDomEffects)) %>%
+      select(Trait,predMeanGVs) %>%
+      unnest(predMeanGVs)
+   return(means) }
+
+#' predOneCrossVarA
+#'
+#' Predict the additive variance or co-variance in one cross.
+#'
+#' @param Trait1 string, label for Trait1. When Trait1==Trait2 computes the genomic variance of the trait, when Trait1!=Trait2 computes the genomic covariance between traits.
+#' @param Trait2 string, label for Trait2. When Trait1==Trait2 computes the genomic variance of the trait, when Trait1!=Trait2 computes the genomic covariance between traits.
 #' @param sireID string, Sire genotype ID. Needs to correspond to renames in haploMat
 #' @param damID string, Dam genotype ID. Needs to correspond to renames in haploMat
-#' @param addEffects column matrix of _additive_ SNP effects estimate with rownames == SNP_IDs and matches the order of related SNP matrices.
 #' @param haploMat matrix of phased haplotypes, 2 rows per sample, cols = loci, {0,1}, rownames assumed to contain GIDs with a suffix, separated by "_" to distinguish haplotypes
 #' @param recombFreqMat a square symmetric matrix with values = (1-2*c1), where c1=matrix of expected recomb. frequencies. The choice to do 1-2c1 outside the function was made for computation efficiency; every operation on a big matrix takes time.
+#' @param predType string, "VPM" or "PMV". Default = "VPM" for variance of posterior means, this is faster but expected to be less accurate / more biased than the alternative predType=="PMV". PMV requires user to supply a variance-covariance matrix of effects estimates.
+#' @param postMeanAddEffects list of named vectors (or column matrices) with the posterior mean ADDITIVE marker effects.
+#' @param postVarCovarOfAddEffects matrix of dimension N SNP x N SNP. ADDITIVE Posterior Sample Variance-Covariance Matrix of Marker Effects Estimates.
 #' @param ...
 #'
-#' @details SNP_IDs must match: names(addEffects)==names(domEffects)==colnames(haploMat)==rownames(recombFreqMat)==colnames(recombFreqMat).
-#'
-#' @return a tibble with values for predicted add/dom variances as well as compute time and memory usage stats
+#' @return tibble with predicted additive variance for one cross, one variance parameter
 #' @export
 #'
 #' @examples
-predCrossVarA<-function(sireID,damID,addEffects,
-                         haploMat,recombFreqMat,...){
+predOneCrossVarA<-function(Trait1,Trait2,sireID,damID,
+                            haploMat,recombFreqMat,predType="VPM",
+                            postMeanAddEffects,
+                            postVarCovarOfAddEffects=NULL,...){
    starttime<-proc.time()[3]
-   # check for and remove SNPs fixed in parents
+
+   # Before predicting variances
+   # check for and remove SNPs that
+   # won't segregate, i.e. are fixed in parents
    ### hopes to save time / mem
    x<-colSums(rbind(haploMat[grep(paste0(sireID,"_"),rownames(haploMat)),],
                     haploMat[grep(paste0(damID,"_"),rownames(haploMat)),]))
    segsnps2keep<-names(x[x>0 & x<4])
+
    if(length(segsnps2keep)>0){
-      # drop=F safegaurds against matrix->vector conversion if only 1 seg. locus (column)
-      haploMat<-haploMat[,segsnps2keep,drop=F]
-      recombFreqMat<-recombFreqMat[segsnps2keep,segsnps2keep,drop=F]
-      addEffects<-addEffects[segsnps2keep,,drop=F]
+      recombFreqMat<-recombFreqMat[segsnps2keep,segsnps2keep]
+      haploMat<-haploMat[sort(c(paste0(parents,"_HapA"),paste0(parents,"_HapB"))),segsnps2keep]
+      postMeanAddEffects<-map(postMeanAddEffects,~.[segsnps2keep])
+      if(predType=="PMV"){
+         postVarCovarOfAddEffects<-postVarCovarOfAddEffects[segsnps2keep,segsnps2keep]
+      }
       # sire and dam LD matrices
       sireLD<-calcGameticLD(sireID,recombFreqMat,haploMat)
       damLD<-calcGameticLD(damID,recombFreqMat,haploMat)
       progenyLD<-sireLD+damLD
+
       rm(recombFreqMat,haploMat,sireLD,damLD); gc()
-      # predict additive variance
-      predAdd<-t(addEffects)%*%(progenyLD)%*%addEffects
+
+      ## Additive
+      #### (Co)Variance of Posterior Means
+      vpm_m2a<-postMeanAddEffects[[Trait1]]%*%progenyLD%*%postMeanAddEffects[[Trait2]]
+      #### Posterior Mean (Co)Variance
+      if(predType=="PMV"){ pmv_m2a<-vpm_m2a+sum(diag(progenyLD%*%postVarCovarOfAddEffects)) }
       totcomputetime<-proc.time()[3]-starttime
-      gc() #gcend
-      # output predicted add and dom vars for current family
-      out<-tibble(varA=predAdd,
-                  segsnps=list(segsnps2keep),
-                  computetime=totcomputetime)
+
+      rm(progenyLDsq,progenyLD); gc()
+
+      ## Tidy the results
+      out<-tibble(VarComp=c("VarA"),
+                  VPM=c(vpm_m2a),
+                  PMV=ifelse(predType=="PMV",c(pmv_m2a),c(NA)),
+                  Nsegsnps=c(length(segsnps2keep)),
+                  totcomputetime=c(totcomputetime))
       print(paste0("Variances predicted for family: ",sireID,"x",damID,"- took ",round(totcomputetime/60,3)," mins"))
    } else {
-      out<-tibble(varA=0,
-                  segsnps=list(),
-                  computetime=0)
+      out<-tibble(VarComp=c("VarA"),
+                  VPM=c(0),
+                  PMV=c(0),
+                  Nsegsnps=c(0),
+                  computetime=c(0))
       print(paste0("Variances predicted for family: ",sireID,"x",damID,"- had no segregating SNPs"))
    }
    return(out)
 }
 
-
-#' predCrossVarAD function
+#' predOneCrossVarAD
 #'
-#' Function to predict the additive and dominance variances in a full-sibling family based on marker effects from a Additive+Dominance genome-wide SNP-BLUP model.
+#' Predict the additive and dominance variance or co-variance in one cross.
 #'
+#' @param Trait1 string, label for Trait1. When Trait1==Trait2 computes the genomic variance of the trait, when Trait1!=Trait2 computes the genomic covariance between traits.
+#' @param Trait2 string, label for Trait2. When Trait1==Trait2 computes the genomic variance of the trait, when Trait1!=Trait2 computes the genomic covariance between traits.
 #' @param sireID string, Sire genotype ID. Needs to correspond to renames in haploMat
 #' @param damID string, Dam genotype ID. Needs to correspond to renames in haploMat
-#' @param addEffects column matrix of _additive_ SNP effects estimate with rownames == SNP_IDs and matches the order of related SNP matrices.
-#' @param domEffects column matrix of _dominance_ SNP effects estimate with rownames == SNP_IDs and matches the order of related SNP matrices.
 #' @param haploMat matrix of phased haplotypes, 2 rows per sample, cols = loci, {0,1}, rownames assumed to contain GIDs with a suffix, separated by "_" to distinguish haplotypes
 #' @param recombFreqMat a square symmetric matrix with values = (1-2*c1), where c1=matrix of expected recomb. frequencies. The choice to do 1-2c1 outside the function was made for computation efficiency; every operation on a big matrix takes time.
+#' @param predType string, "VPM" or "PMV". Default = "VPM" for variance of posterior means, this is faster but expected to be less accurate / more biased than the alternative predType=="PMV". PMV requires user to supply a variance-covariance matrix of effects estimates.
+#' @param postMeanAddEffects list of named vectors (or column matrices) with the posterior mean ADDITIVE marker effects.
+#' @param postMeanDomEffects list of named vectors (or column matrices) with the posterior mean DOMINANCE marker effects.
+#' @param postVarCovarOfAddEffects matrix of dimension N SNP x N SNP. ADDITIVE Posterior Sample Variance-Covariance Matrix of Marker Effects Estimates.
+#' @param postVarCovarOfDomEffects matrix of dimension N SNP x N SNP. DOMINANCE Posterior Sample Variance-Covariance Matrix of Marker Effects Estimates.
 #' @param ...
 #'
-#' @details SNP_IDs must match: names(addEffects)==names(domEffects)==colnames(haploMat)==rownames(recombFreqMat)==colnames(recombFreqMat).
-#'
-#' @return a tibble with values for predicted add/dom variances as well as compute time and memory usage stats
+#' @return tibble with predicted additive and dominance variance for one cross, one variance parameter
 #' @export
 #'
 #' @examples
-predCrossVarAD<-function(sireID,damID,addEffects,domEffects,
-                         haploMat,recombFreqMat,...){
-   #gcbegin<-gc(reset = T)
+predOneCrossVarAD<-function(Trait1,Trait2,sireID,damID,
+                            haploMat,recombFreqMat,predType="VPM",
+                            postMeanAddEffects,postMeanDomEffects,
+                            postVarCovarOfAddEffects=NULL,postVarCovarOfDomEffects=NULL,...){
    starttime<-proc.time()[3]
-   # check for and remove SNPs fixed in parents
+
+   # Before predicting variances
+   # check for and remove SNPs that
+   # won't segregate, i.e. are fixed in parents
    ### hopes to save time / mem
    x<-colSums(rbind(haploMat[grep(paste0(sireID,"_"),rownames(haploMat)),],
                     haploMat[grep(paste0(damID,"_"),rownames(haploMat)),]))
    segsnps2keep<-names(x[x>0 & x<4])
+
    if(length(segsnps2keep)>0){
-      # drop=F safegaurds against matrix->vector conversion if only 1 seg. locus (column)
-      haploMat<-haploMat[,segsnps2keep,drop=F]
-      recombFreqMat<-recombFreqMat[segsnps2keep,segsnps2keep,drop=F]
-      addEffects<-addEffects[segsnps2keep,,drop=F]
-      domEffects<-domEffects[segsnps2keep,,drop=F]
+      recombFreqMat<-recombFreqMat[segsnps2keep,segsnps2keep]
+      haploMat<-haploMat[sort(c(paste0(parents,"_HapA"),paste0(parents,"_HapB"))),segsnps2keep]
+      postMeanAddEffects<-map(postMeanAddEffects,~.[segsnps2keep])
+      postMeanDomEffects<-map(postMeanDomEffects,~.[segsnps2keep])
+      if(predType=="PMV"){
+         postVarCovarOfAddEffects<-postVarCovarOfAddEffects[segsnps2keep,segsnps2keep]
+         postVarCovarOfDomEffects<-postVarCovarOfDomEffects[segsnps2keep,segsnps2keep]
+      }
       # sire and dam LD matrices
       sireLD<-calcGameticLD(sireID,recombFreqMat,haploMat)
       damLD<-calcGameticLD(damID,recombFreqMat,haploMat)
       progenyLD<-sireLD+damLD
+
       rm(recombFreqMat,haploMat,sireLD,damLD); gc()
-      # predict additive variance
-      predAdd<-t(addEffects)%*%(progenyLD)%*%addEffects
-      # predict dominance variance
-      predDom<-t(domEffects)%*%(progenyLD)^2%*%domEffects
+
+      ## Additive
+      #### (Co)Variance of Posterior Means
+      vpm_m2a<-postMeanAddEffects[[Trait1]]%*%progenyLD%*%postMeanAddEffects[[Trait2]]
+      #### Posterior Mean (Co)Variance
+      if(predType=="PMV"){ pmv_m2a<-vpm_m2a+sum(diag(progenyLD%*%postVarCovarOfAddEffects)) }
+      ## Dominance
+      #### (Co)Variance of Posterior Means
+      progenyLDsq<-progenyLD^2
+      vpm_m2d<-postMeanDomEffects[[Trait1]]%*%progenyLDsq%*%postMeanDomEffects[[Trait2]]
+      #### Posterior Mean (Co)Variance
+      if(predType=="PMV"){ pmv_m2d<-vpm_m2d+sum(diag(progenyLDsq%*%postVarCovarOfDomEffects)) }
       totcomputetime<-proc.time()[3]-starttime
-      gc() #gcend
-      # output predicted add and dom vars for current family
-      out<-tibble(varA=predAdd,
-                  varD=predDom,
-                  segsnps=list(segsnps2keep),
-                  computetime=totcomputetime)
+
+      rm(progenyLDsq,progenyLD); gc()
+
+      ## Tidy the results
+      out<-tibble(VarComp=c("VarA","VarD"),
+                  VPM=c(vpm_m2a,vpm_m2d),
+                  PMV=ifelse(predType=="PMV",c(pmv_m2a,pmv_m2d),c(NA,NA)),
+                  Nsegsnps=c(length(segsnps2keep),NA),
+                  totcomputetime=c(totcomputetime,NA))
       print(paste0("Variances predicted for family: ",sireID,"x",damID,"- took ",round(totcomputetime/60,3)," mins"))
    } else {
-      out<-tibble(varA=0,
-                  varD=0,
-                  segsnps=list(),
-                  computetime=0)
+      out<-tibble(VarComp=c("VarA","VarD"),
+                  VPM=c(0,0),
+                  PMV=c(0,0),
+                  Nsegsnps=c(0,0),
+                  computetime=c(0,0))
       print(paste0("Variances predicted for family: ",sireID,"x",damID,"- had no segregating SNPs"))
    }
    return(out)
 }
 
-
-#' runCrossVarPredsA
+#' predCrossVarsA
 #'
-#' Function to compute predicted add + dom vars for an entire pedigree.
-#' If outprefix and outpath are supplied, writes output to disk so impatient users can see results.
+#' Predict the additive variance or co-variance for a set of crosses, potentially in parallel across families.
+#' Wraps predOneCrossVarA across families.
 #'
-#' @param outprefix
-#' @param outpath
-#' @param ped pedigree data.frame, cols: sireID, damID. sireID and damID must both be in the haploMat.
-#' @param addEffects vector of _additive_ SNP effects estimate. Ideally vector is named with SNP IDs and matches the order of related SNP matrices.
+#' @param Trait1 string, label for Trait1. When Trait1==Trait2 computes the genomic variance of the trait, when Trait1!=Trait2 computes the genomic covariance between traits.
+#' @param Trait2 string, label for Trait2. When Trait1==Trait2 computes the genomic variance of the trait, when Trait1!=Trait2 computes the genomic covariance between traits.
+#' @param CrossesToPredict data.frame or tibble, col/colnames: sireID, damID. sireID and damID must both be in the haploMat.
+#' @param predType string, "VPM" or "PMV". Default = "VPM" for variance of posterior means, this is faster but expected to be less accurate / more biased than the alternative predType=="PMV". PMV requires user to supply a variance-covariance matrix of effects estimates.
 #' @param haploMat matrix of phased haplotypes, 2 rows per sample, cols = loci, {0,1}, rownames assumed to contain GIDs with a suffix, separated by "_" to distinguish haplotypes
 #' @param recombFreqMat a square symmetric matrix with values = (1-2*c1), where c1=matrix of expected recomb. frequencies. The choice to do 1-2c1 outside the function was made for computation efficiency; every operation on a big matrix takes time.
+#' @param postMeanAddEffects list of named vectors (or column matrices) with the posterior mean ADDITIVE marker effects.
+#' @param AddEffectList list of ADDITIVE effect matrices, one matrix per trait, Each element of the list is named with a string identifying the trait and the colnames of each matrix are labelled with snpIDs.
 #' @param ncores If ncores set > 1 parallelizes across families, but beware it is memory intensive and options(future.globals.maxSize=___) may need to be adjusted.
 #' @param ...
 #'
-#' @return
+#' @return list with two elements, "predictedfamvars" contains a tibble with all predictions for all requested families, "totcomputetime" gives the time taken to compute one var. parameter across all familes, at the given ncores.
 #' @export
 #'
 #' @examples
-runCrossVarPredsA<-function(outprefix=NULL,outpath=NULL,
-                            ped,addEffects,
-                            haploMat,recombFreqMat,ncores=1,...){
-   require(furrr); options(mc.cores=ncores); plan(multiprocess)
-   timestart<-proc.time()[3]
-   predictedfamvars<-ped %>%
-      dplyr::mutate(predVars=future_map2(sireID,damID,
-                                         ~predCrossVarA(sireID=.x,damID=.y,
-                                                        addEffects=addEffects,
-                                                        haploMat=haploMat,
-                                                        recombFreqMat=recombFreqMat))) %>%
-      tidyr::unnest(predVars)
-   endtime<-proc.time()[3];
-   print(paste0("Done predicting fam vars. ",
-                "Took ",round((endtime-timestart)/60,2),
-                " mins for ",nrow(predictedfamvars)," families"))
-   if(!is.null(outprefix) & !is.null(outpath)){
-      saveRDS(predictedfamvars,
-              file=here::here(outpath,paste0(outprefix,"_predCrossVars_ModelAD.rds")))
+predCrossVarsA<-function(Trait1,Trait2,CrossesToPredict,predType="VPM",
+                          haploMat,recombFreqMat,
+                          postMeanAddEffects,
+                          AddEffectList=NULL,
+                          ncores=1,...){
+
+   starttime<-proc.time()[3]
+   if(predType=="PMV"){
+      # Posterior Sample Variance-Covariance Matrix of Marker Effects
+      postVarCovarOfAddEffects<-(1/(nrow(AddEffectList[[Trait1]])-1))*crossprod(AddEffectList[[Trait1]],AddEffectList[[Trait2]])
+      rm(AddEffectList); gc()
+   } else {
+      postVarCovarOfAddEffects<-NULL;
    }
+
+   require(furrr); options(mc.cores=ncores); plan(multiprocess)
+   predictedfamvars<-CrossesToPredict %>%
+      dplyr::mutate(predVars=future_pmap(.,
+                                         predOneCrossVarA,
+                                         Trait1=Trait1,Trait2=Trait2,
+                                         haploMat=haploMat,recombFreqMat=recombFreqMat,
+                                         predType=predType,
+                                         postMeanAddEffects=postMeanAddEffects,
+                                         postVarCovarOfAddEffects=postVarCovarOfAddEffects))
+   totcomputetime<-proc.time()[3]-starttime
+   print(paste0("Done predicting fam vars. ",
+                "Took ",round((totcomputetime)/60,2),
+                " mins for ",nrow(predictedfamvars)," families"))
+   predictedfamvars<-list(predictedfamvars=predictedfamvars,totcomputetime=totcomputetime)
    return(predictedfamvars)
 }
 
+#' predCrossVarsAD
+#'
+#' Predict the additive and dominance variance or co-variance for a set of crosses, potentially in parallel across families.
+#' Wraps predOneCrossVarAD across families
+#'
+#' @param Trait1 string, label for Trait1. When Trait1==Trait2 computes the genomic variance of the trait, when Trait1!=Trait2 computes the genomic covariance between traits.
+#' @param Trait2 string, label for Trait2. When Trait1==Trait2 computes the genomic variance of the trait, when Trait1!=Trait2 computes the genomic covariance between traits.
+#' @param CrossesToPredict data.frame or tibble, col/colnames: sireID, damID. sireID and damID must both be in the haploMat.
+#' @param predType string, "VPM" or "PMV". Default = "VPM" for variance of posterior means, this is faster but expected to be less accurate / more biased than the alternative predType=="PMV". PMV requires user to supply a variance-covariance matrix of effects estimates.
+#' @param haploMat matrix of phased haplotypes, 2 rows per sample, cols = loci, {0,1}, rownames assumed to contain GIDs with a suffix, separated by "_" to distinguish haplotypes
+#' @param recombFreqMat a square symmetric matrix with values = (1-2*c1), where c1=matrix of expected recomb. frequencies. The choice to do 1-2c1 outside the function was made for computation efficiency; every operation on a big matrix takes time.
+#' @param postMeanAddEffects list of named vectors (or column matrices) with the posterior mean ADDITIVE marker effects.
+#' @param postMeanDomEffects list of named vectors (or column matrices) with the posterior mean DOMINANCE marker effects.
+#' @param AddEffectList list of ADDITIVE effect matrices, one matrix per trait, Each element of the list is named with a string identifying the trait and the colnames of each matrix are labelled with snpIDs.
+#' @param DomEffectList list of DOMINANCE effect matrices, one matrix per trait, Each element of the list is named with a string identifying the trait and the colnames of each matrix are labelled with snpIDs.
+#' @param ncores If ncores set > 1 parallelizes across families, but beware it is memory intensive and options(future.globals.maxSize=___) may need to be adjusted.
+#' @param ...
+#'
+#' @return list with two elements, "predictedfamvars" contains a tibble with all predictions for all requested families, "totcomputetime" gives the time taken to compute one var. parameter across all familes, at the given ncores.
+#' @export
+#'
+#' @examples
+predCrossVarsAD<-function(Trait1,Trait2,CrossesToPredict,predType="VPM",
+                          haploMat,recombFreqMat,
+                          postMeanAddEffects,postMeanDomEffects,
+                          AddEffectList=NULL,DomEffectList=NULL,
+                          ncores=1,...){
 
-#' runCrossVarPredsAD
+   starttime<-proc.time()[3]
+   if(predType=="PMV"){
+      # Posterior Sample Variance-Covariance Matrix of Marker Effects
+      postVarCovarOfAddEffects<-(1/(nrow(AddEffectList[[Trait1]])-1))*crossprod(AddEffectList[[Trait1]],AddEffectList[[Trait2]])
+      postVarCovarOfDomEffects<-(1/(nrow(DomEffectList[[Trait1]])-1))*crossprod(DomEffectList[[Trait1]],DomEffectList[[Trait2]])
+   rm(AddEffectList,DomEffectList); gc()
+   } else {
+      postVarCovarOfAddEffects<-NULL;
+      postVarCovarOfDomEffects<-NULL;
+      }
+
+   require(furrr); options(mc.cores=ncores); plan(multiprocess)
+   predictedfamvars<-CrossesToPredict %>%
+      dplyr::mutate(predVars=future_pmap(.,
+                                         predOneCrossVarAD,
+                                         Trait1=Trait1,Trait2=Trait2,
+                                         haploMat=haploMat,recombFreqMat=recombFreqMat,
+                                         predType=predType,
+                                         postMeanAddEffects=postMeanAddEffects,
+                                         postMeanDomEffects=postMeanDomEffects,
+                                         postVarCovarOfAddEffects=postVarCovarOfAddEffects,
+                                         postVarCovarOfDomEffects=postVarCovarOfDomEffects))
+   totcomputetime<-proc.time()[3]-starttime
+   print(paste0("Done predicting fam vars. ",
+                "Took ",round((totcomputetime)/60,2),
+                " mins for ",nrow(predictedfamvars)," families"))
+   predictedfamvars<-list(predictedfamvars=predictedfamvars,totcomputetime=totcomputetime)
+   return(predictedfamvars)
+   }
+
+
+#' runMtCrossVarPredsA
 #'
-#' Function to compute predicted add + dom vars for an entire pedigree.
-#' If outprefix and outpath are supplied, writes output to disk so impatient users can see results.
+#' Predict the additive variances _and_ covariances for a set of crosses, potentially in parallel across families.
+#' Wraps predCrossVarsAD across variance parameters.
 #'
-#' @param outprefix
-#' @param outpath
-#' @param ped pedigree data.frame, cols: sireID, damID. sireID and damID must both be in the haploMat.
-#' @param addEffects vector of _additive_ SNP effects estimate. Ideally vector is named with SNP IDs and matches the order of related SNP matrices.
-#' @param domEffects vector of _dominance_ SNP effects estimate. Ideally vector is named with SNP IDs and matches the order of related SNP matrices.
+#' @param outprefix string, prefix for *.rds file to be written to disk with output. DEFAULT = NULL (no disk write)
+#' @param outpath string, path to disk location where files should be written. Can be left DEFAULT = NULL (no disk write)
+#' @param predType string, "VPM" or "PMV". Default = "VPM" for variance of posterior means, this is faster but expected to be less accurate / more biased than the alternative predType=="PMV". PMV requires user to supply a variance-covariance matrix of effects estimates.
+#' @param CrossesToPredict data.frame or tibble, col/colnames: sireID, damID. sireID and damID must both be in the haploMat.
+#' @param AddEffectList list of ADDITIVE effect matrices, one matrix per trait, Each element of the list is named with a string identifying the trait and the colnames of each matrix are labelled with snpIDs.
 #' @param haploMat matrix of phased haplotypes, 2 rows per sample, cols = loci, {0,1}, rownames assumed to contain GIDs with a suffix, separated by "_" to distinguish haplotypes
 #' @param recombFreqMat a square symmetric matrix with values = (1-2*c1), where c1=matrix of expected recomb. frequencies. The choice to do 1-2c1 outside the function was made for computation efficiency; every operation on a big matrix takes time.
 #' @param ncores If ncores set > 1 parallelizes across families, but beware it is memory intensive and options(future.globals.maxSize=___) may need to be adjusted.
@@ -456,1001 +618,112 @@ runCrossVarPredsA<-function(outprefix=NULL,outpath=NULL,
 #' @export
 #'
 #' @examples
-runCrossVarPredsAD<-function(outprefix=NULL,outpath=NULL,
-                             ped,addEffects,domEffects,
-                             haploMat,recombFreqMat,ncores=1,...){
-      require(furrr); options(mc.cores=ncores); plan(multiprocess)
-      timestart<-proc.time()[3]
-      predictedfamvars<-ped %>%
-            dplyr::mutate(predVars=future_map2(sireID,damID,
-                                               ~predCrossVarAD(sireID=.x,damID=.y,
-                                                               addEffects=addEffects,
-                                                               domEffects=domEffects,
-                                                               haploMat=haploMat,
-                                                               recombFreqMat=recombFreqMat))) %>%
-            tidyr::unnest(predVars)
-      endtime<-proc.time()[3];
-      print(paste0("Done predicting fam vars. ",
-                   "Took ",round((endtime-timestart)/60,2),
-                   " mins for ",nrow(predictedfamvars)," families"))
-      if(!is.null(outprefix) & !is.null(outpath)){
-            saveRDS(predictedfamvars,
-                    file=here::here(outpath,paste0(outprefix,"_predCrossVars_ModelAD.rds")))
-      }
-      return(predictedfamvars)
-}
+runMtCrossVarPredsA<-function(outprefix=NULL,outpath=NULL,predType="VPM",
+                               CrossesToPredict,AddEffectList,
+                               haploMat,recombFreqMat,ncores=1,...){
+   starttime<-proc.time()[3]
+   traits<-names(AddEffectList)
+   parents<-CrossesToPredict %$% union(sireID,damID)
 
-#' backsolveSNPeff
-#'
-#' From the GBLUP solutions and a centered SNP matrix backsolve SNP effects
-#'
-#' @param Z Centered marker matrix (dominance deviations must also be centered)
-#' @param g The solutions (blups, i.e. GEBVs) from the GBLUP model
-#'
-#' @return matrix of SNP effects matching RR-BLUP / SNP-BLUP
-#' @export
-#'
-#' @examples
-#' A<-kinship(M,type="add")
-#' trainingDF %<>% dplyr::mutate(ga=factor(as.character(id),
-#'                                         levels=rownames(A)),
-#'                               gd=ga)
-#' gblup<-mmer(pheno~1,
-#'             random=~vs(ga,Gu = A),
-#'             weights=WT,
-#'             data=trainingDF,verbose = T)
-#' ga<-as.matrix(gblup$U$`u:ga`$pheno,ncol=1)
-#' Za<-centerDosage(M)
-#' snpeff<-backsolveSNPeff(Za,ga)
-backsolveSNPeff<-function(Z,g){
-      ZZt<-tcrossprod(Z)
-      diag(ZZt)<-diag(ZZt)+1e-8
-      bslvEffs<-crossprod(Z,solve(ZZt))%*%g
-      return(bslvEffs)
-}
+   # Center posterior distribution of effects
+   ## on posterior mean across MCMC samples
+   AddEffectList %<>% map(.,~scale(.,center = T, scale = F))
 
-#' multitraitPMV_AD
-#'
-#' Compuate all pairwise _posterior mean_ genetic variances and covariance for an Bayesian multi-trait additive plus dominance effects model fit to some current population.
-#'
-#' Lehermeier et al. 2017. J Anim Breed Genet. 2017;134:232–41.
-#' Lehermeier et al. 2017. Genetics, 207(4), 1651–1661. https://doi.org/10.1534/genetics.117.300403
-#' Neyhart et al. 2019. G3 9(10), https://doi.org/10.1534/g3.119.400406
-#' Alves et al. 2019. Plant Methods, https://doi.org/10.1186/s13007-019-0388-x
-#' Schreck et al. 2019. https://doi.org/10.1534/genetics.119.302324
-#'
-#' @param AddEffectArray 3D array of ADDITIVE marker effects from each MCMC sample. BGLR::Multitrait() writes a binary file to disk when saveEffects=TRUE is specified. It can be read to R with BGLR::readBinMatMultitrait().
-#' @param DomEffectArray 3D array of DOMINANCE marker effects from each MCMC sample. BGLR::Multitrait() writes a binary file to disk when saveEffects=TRUE is specified. It can be read to R with BGLR::readBinMatMultitrait().
-#' @param traits character vector, in order of traits supplied to BGLR
-#' @param genoVarCovarMat variance-covariance matrix of marker genotypes, i.e. linkage disequilibrium
-#' @param nIter number of iterations used for MCMC [used internally only to exclude burn-in samples from computation]
-#' @param burnIn burnIn for MCMC [used internally only to exclude burn-in samples from computation]
-#' @param thin thin for MCMC [used internally only to exclude burn-in samples from computation]
-#'
-#' @return tibble with both M1 (no LD) and M2 (LD) for all variances and covariances
-#' @export
-#'
-#' @examples
-multitraitPMV_AD<-function(AddEffectArray, DomEffectArray, traits,
-                           genoVarCovarMat, nIter, burnIn, thin){
-   # Discard burnIn
-   AddEffectArray<-AddEffectArray[-c(1:burnIn/thin),,]
-   DomEffectArray<-DomEffectArray[-c(1:burnIn/thin),,]
-   # Add dimnames
-   dimnames(AddEffectArray)[[2]]<-colnames(genoVarCovarMat) # p SNPs
-   dimnames(AddEffectArray)[[3]]<-traits # t traits
-   dimnames(DomEffectArray)[[2]]<-colnames(genoVarCovarMat) # p SNPs
-   dimnames(DomEffectArray)[[3]]<-traits # t traits
+   ## Get the posterior mean effects vectors
+   postMeanAddEffects<-map(AddEffectList,~attr(.,which = "scaled:center"))
 
-   # Make tibble of pairwise variance parameters to compute
-   ## Include trait-trait variances, avoid duplicating covariances
-   ## i.e. lower triangle including diagonals of var-covar matrix
+   ## Predict trait (co)variances
    varcovars<-bind_rows(tibble(Trait1=traits,Trait2=traits), # trait variances
                         combn(traits,2,simplify = T) %>% # covariances
                            t(.) %>% #
                            `colnames<-`(.,c("Trait1","Trait2")) %>%
                            as_tibble)
 
+   haploMat<-haploMat[sort(c(paste0(parents,"_HapA"),paste0(parents,"_HapB"))),snpIDs]
 
-   # 3D arrays of effects to lists-of-matrices (by trait)
-   # Center posterior distribution of effects
-   ## on posterior mean across MCMC samples
-   AddEffectArray<-array_branch(AddEffectArray,3) %>%
-      map(.,~scale(.,center = T, scale = F))
-   DomEffectArray<-array_branch(DomEffectArray,3) %>%
-      map(.,~scale(.,center = T, scale = F))
-
-   ## Get the posterior mean effects vectors
-   postMeanAddEffects<-map(AddEffectArray,~attr(.,which = "scaled:center"))
-   postMeanDomEffects<-map(DomEffectArray,~attr(.,which = "scaled:center"))
-
-   ## For each variance parameter
-   mtPMVad<-function(Trait1,Trait2,
-                     AddEffectArray,DomEffectArray,
-                     postMeanAddEffects,postMeanDomEffects){
-
-      # Posterior Sample Variance-Covariance Matrix of Marker Effects
-      postVarCovarOfAddEffects<-(1/(nrow(AddEffectArray[[Trait1]])-1))*crossprod(AddEffectArray[[Trait1]],AddEffectArray[[Trait2]])
-      postVarCovarOfDomEffects<-(1/(nrow(DomEffectArray[[Trait1]])-1))*crossprod(DomEffectArray[[Trait1]],DomEffectArray[[Trait2]])
-
-      # Method 1 (Unconditional, Not accounting for LD)
-      ## Additive
-      #### (Co)Variance of Posterior Means
-      vpm_m1a<-sum(diag(genoVarCovarMat)*(postMeanAddEffects[[Trait1]]*postMeanAddEffects[[Trait2]]))
-      #### Posterior Mean (Co)Variance
-      effects_uncertainty_m1a<-sum(diag(postVarCovarOfAddEffects)*diag(genoVarCovarMat))
-      pmv_m1a<-vpm_m1a+effects_uncertainty_m1a
-      ## Dominance
-      #### (Co)Variance of Posterior Means
-      vpm_m1d<-sum(diag(genoVarCovarMat)^2*(postMeanDomEffects[[Trait1]]*postMeanDomEffects[[Trait2]]))
-      #### Posterior Mean (Co)Variance
-      effects_uncertainty_m1d<-sum(diag(postVarCovarOfDomEffects)*(diag(genoVarCovarMat)^2))
-      pmv_m1d<-vpm_m1d+effects_uncertainty_m1d
-
-      # Method 2 (Conditioned on LD)
-      ## Additive
-      #### (Co)Variance of Posterior Means
-      vpm_m2a<-postMeanAddEffects[[Trait1]]%*%genoVarCovarMat%*%postMeanAddEffects[[Trait2]]
-      #### Posterior Mean (Co)Variance
-      effects_uncertainty_m2a<-sum(diag(genoVarCovarMat%*%postVarCovarOfAddEffects))
-      pmv_m2a<-vpm_m2a+effects_uncertainty_m2a
-      ## Dominance
-      #### (Co)Variance of Posterior Means
-      genoVarCovarMatSq<-genoVarCovarMat^2
-      vpm_m2d<-postMeanDomEffects[[Trait1]]%*%genoVarCovarMatSq%*%postMeanDomEffects[[Trait2]]
-      #### Posterior Mean (Co)Variance
-      effects_uncertainty_m2d<-sum(diag(genoVarCovarMatSq%*%postVarCovarOfDomEffects))
-      pmv_m2d<-vpm_m2d+effects_uncertainty_m2d
-
-      # Tidy the results
-      out<-bind_rows(tibble(VarComp=c("VarA","VarD"),
-                            Method=c("M1","M1"),
-                            VPM=c(vpm_m1a,vpm_m1d), # NOTE: unsure relevance of "VPM" for Method 1, suggest ignoring
-                            PMV=c(pmv_m1a,pmv_m1d)), #### PMV for Method 1 matches the standard VarComps you would get from BGLR
-                     tibble(VarComp=c("VarA","VarD"),
-                            Method=c("M2","M2"),
-                            VPM=c(vpm_m2a,vpm_m2d),
-                            PMV=c(pmv_m2a,pmv_m2d)))
-      return(out)
+   if(predType!="PMV"){
+      AddEffectList<-NULL;
    }
 
    varcovars %<>%
-      mutate(varcomps=pmap(.,mtPMVad,AddEffectArray,DomEffectArray,postMeanAddEffects,postMeanDomEffects)) %>%
-      unnest(varcomps)
+      mutate(varcomps=pmap(.,predCrossVarsA,CrossesToPredict,predType=predType,
+                           AddEffectList,
+                           haploMat,recombFreqMat,
+                           postMeanAddEffects,ncores))
+
+   totcomputetime<-proc.time()[3]-starttime
+   varcovars<-list(varcovars=varcovars,
+                   totcomputetime=totcomputetime)
+   if(!is.null(outprefix) & !is.null(outpath)){
+      saveRDS(varcovars,file=here::here(outpath,paste0(outprefix,"_predVarsAndCovars.rds")))
+   }
    return(varcovars)
 }
 
-#' multitraitPMV_AD
+#' runMtCrossVarPredsAD
 #'
-#' Compuate all pairwise _posterior mean_ genetic variances and covariance for an Bayesian multi-trait single kernel, additive effects-only model fit to some current population.
+#' Predict the additive and dominance variances _and_ covariances for a set of crosses, potentially in parallel across families.
+#' Wraps predCrossVarsAD across variance parameters.
 #'
-#' Lehermeier et al. 2017. J Anim Breed Genet. 2017;134:232–41.
-#' Lehermeier et al. 2017. Genetics, 207(4), 1651–1661. https://doi.org/10.1534/genetics.117.300403
-#' Neyhart et al. 2019. G3 9(10), https://doi.org/10.1534/g3.119.400406
-#' Alves et al. 2019. Plant Methods, https://doi.org/10.1186/s13007-019-0388-x
-#' Schreck et al. 2019. https://doi.org/10.1534/genetics.119.302324
+#' @param outprefix string, prefix for *.rds file to be written to disk with output. DEFAULT = NULL (no disk write)
+#' @param outpath string, path to disk location where files should be written. Can be left DEFAULT = NULL (no disk write)
+#' @param predType string, "VPM" or "PMV". Default = "VPM" for variance of posterior means, this is faster but expected to be less accurate / more biased than the alternative predType=="PMV". PMV requires user to supply a variance-covariance matrix of effects estimates.
+#' @param CrossesToPredict data.frame or tibble, col/colnames: sireID, damID. sireID and damID must both be in the haploMat.
+#' @param AddEffectList list of ADDITIVE effect matrices, one matrix per trait, Each element of the list is named with a string identifying the trait and the colnames of each matrix are labelled with snpIDs.
+#' @param DomEffectList list of DOMINANCE effect matrices, one matrix per trait, Each element of the list is named with a string identifying the trait and the colnames of each matrix are labelled with snpIDs.
+#' @param haploMat matrix of phased haplotypes, 2 rows per sample, cols = loci, {0,1}, rownames assumed to contain GIDs with a suffix, separated by "_" to distinguish haplotypes
+#' @param recombFreqMat a square symmetric matrix with values = (1-2*c1), where c1=matrix of expected recomb. frequencies. The choice to do 1-2c1 outside the function was made for computation efficiency; every operation on a big matrix takes time.
+#' @param ncores If ncores set > 1 parallelizes across families, but beware it is memory intensive and options(future.globals.maxSize=___) may need to be adjusted.
+#' @param ...
 #'
-#' @param AddEffectArray 3D array of ADDITIVE marker effects from each MCMC sample. BGLR::Multitrait() writes a binary file to disk when saveEffects=TRUE is specified. It can be read to R with BGLR::readBinMatMultitrait().
-#' @param traits character vector, in order of traits supplied to BGLR
-#' @param genoVarCovarMat variance-covariance matrix of marker genotypes, i.e. linkage disequilibrium
-#' @param nIter number of iterations used for MCMC [used internally only to exclude burn-in samples from computation]
-#' @param burnIn burnIn for MCMC [used internally only to exclude burn-in samples from computation]
-#' @param thin thin for MCMC [used internally only to exclude burn-in samples from computation]
-#'
-#' @return tibble with both M1 (no LD) and M2 (LD) for all variances and covariances
+#' @return
 #' @export
 #'
 #' @examples
-multitraitPMV_A<-function(AddEffectArray, traits,
-                          genoVarCovarMat, nIter, burnIn, thin){
-   # Discard burnIn
-   AddEffectArray<-AddEffectArray[-c(1:burnIn/thin),,]
-   # Add dimnames
-   dimnames(AddEffectArray)[[2]]<-colnames(genoVarCovarMat) # p SNPs
-   dimnames(AddEffectArray)[[3]]<-traits # t traits
+runMtCrossVarPredsAD<-function(outprefix=NULL,outpath=NULL,predType="VPM",
+                               CrossesToPredict,AddEffectList,DomEffectList,
+                               haploMat,recombFreqMat,ncores=1,...){
+   starttime<-proc.time()[3]
+   traits<-names(AddEffectList)
+   parents<-CrossesToPredict %$% union(sireID,damID)
 
-   # Make tibble of pairwise variance parameters to compute
-   ## Include trait-trait variances, avoid duplicating covariances
-   ## i.e. lower triangle including diagonals of var-covar matrix
+   # Center posterior distribution of effects
+   ## on posterior mean across MCMC samples
+   AddEffectList %<>% map(.,~scale(.,center = T, scale = F))
+   DomEffectList %<>% map(.,~scale(.,center = T, scale = F))
+
+   ## Get the posterior mean effects vectors
+   postMeanAddEffects<-map(AddEffectList,~attr(.,which = "scaled:center"))
+   postMeanDomEffects<-map(DomEffectList,~attr(.,which = "scaled:center"))
+
+   ## Predict trait (co)variances
    varcovars<-bind_rows(tibble(Trait1=traits,Trait2=traits), # trait variances
                         combn(traits,2,simplify = T) %>% # covariances
                            t(.) %>% #
                            `colnames<-`(.,c("Trait1","Trait2")) %>%
                            as_tibble)
 
+   haploMat<-haploMat[sort(c(paste0(parents,"_HapA"),paste0(parents,"_HapB"))),snpIDs]
 
-   # 3D arrays of effects to lists-of-matrices (by trait)
-   # Center posterior distribution of effects
-   ## on posterior mean across MCMC samples
-   AddEffectArray<-array_branch(AddEffectArray,3) %>%
-      map(.,~scale(.,center = T, scale = F))
-
-   ## Get the posterior mean effects vectors
-   postMeanAddEffects<-map(AddEffectArray,~attr(.,which = "scaled:center"))
-
-   ## For each variance parameter
-   mtPMVa<-function(Trait1,Trait2,
-                    AddEffectArray,
-                    postMeanAddEffects){
-
-      # Posterior Sample Variance-Covariance Matrix of Marker Effects
-      postVarCovarOfAddEffects<-(1/(nrow(AddEffectArray[[Trait1]])-1))*crossprod(AddEffectArray[[Trait1]],AddEffectArray[[Trait2]])
-
-      # Method 1 (Unconditional, Not accounting for LD)
-      ## Additive
-      #### (Co)Variance of Posterior Means
-      vpm_m1a<-sum(diag(genoVarCovarMat)*(postMeanAddEffects[[Trait1]]*postMeanAddEffects[[Trait2]]))
-      #### Posterior Mean (Co)Variance
-      effects_uncertainty_m1a<-sum(diag(postVarCovarOfAddEffects)*diag(genoVarCovarMat))
-      pmv_m1a<-vpm_m1a+effects_uncertainty_m1a
-
-      # Method 2 (Conditioned on LD)
-      ## Additive
-      #### (Co)Variance of Posterior Means
-      vpm_m2a<-postMeanAddEffects[[Trait1]]%*%genoVarCovarMat%*%postMeanAddEffects[[Trait2]]
-      #### Posterior Mean (Co)Variance
-      effects_uncertainty_m2a<-sum(diag(genoVarCovarMat%*%postVarCovarOfAddEffects))
-      pmv_m2a<-vpm_m2a+effects_uncertainty_m2a
-
-      # Tidy the results
-      out<-bind_rows(tibble(VarComp=c("VarA"),
-                            Method=c("M1"),
-                            VPM=c(vpm_m1a), # NOTE: unsure relevance of "VPM" for Method 1, suggest ignoring
-                            PMV=c(pmv_m1a)), #### PMV for Method 1 matches the standard VarComps you would get from BGLR
-                     tibble(VarComp=c("VarA"),
-                            Method=c("M2"),
-                            VPM=c(vpm_m2a),
-                            PMV=c(pmv_m2a)))
-      return(out)
+   if(predType!="PMV"){
+      AddEffectList<-NULL;
+      DomEffectList<-NULL;
    }
 
    varcovars %<>%
-      mutate(varcomps=pmap(.,mtPMVa,AddEffectArray,postMeanAddEffects)) %>%
-      unnest(varcomps)
+      mutate(varcomps=pmap(.,predCrossVarsAD,CrossesToPredict,predType=predType,
+                           AddEffectList,DomEffectList,
+                           haploMat,recombFreqMat,
+                           postMeanAddEffects,postMeanDomEffects,ncores))
+
+   totcomputetime<-proc.time()[3]-starttime
+   varcovars<-list(varcovars=varcovars,
+                   totcomputetime=totcomputetime)
+   if(!is.null(outprefix) & !is.null(outpath)){
+      saveRDS(varcovars,file=here::here(outpath,paste0(outprefix,"_predVarsAndCovars.rds")))
+   }
    return(varcovars)
 }
 
 
-#' runMultiTraitCrossPredAD
-#'
-#' For a set of crosses, with an array of posterior marker effects for multiple traits and a multi-component, namely an additive plus dominance model, predict the genetic means, (co)variances for all traits and all crosses.
-#' For prediction of variances, consider only segregating SNPs to save time and memory.
-#'
-#' @param outprefix
-#' @param outpath
-#' @param CrossesToPredict
-#' @param AddEffectArray
-#' @param DomEffectArray
-#' @param traits
-#' @param snpIDs
-#' @param nIter
-#' @param burnIn
-#' @param thin
-#' @param haploMat
-#' @param doseMat
-#' @param recombFreqMat
-#' @param ncores
-#' @param ...
-#'
-#' @return
-#' @export
-#'
-#' @examples
-runMultiTraitCrossPredAD<-function(outprefix=NULL,outpath=NULL,
-                                   CrossesToPredict,AddEffectArray,DomEffectArray,
-                                   traits, snpIDs, nIter, burnIn, thin,
-                                   haploMat,doseMat,recombFreqMat,ncores=1,...){
-   starttime<-proc.time()[3]
-   # Add dimnames
-   dimnames(AddEffectArray)[[2]]<-snpIDs
-   dimnames(AddEffectArray)[[3]]<-traits # t traits
-   dimnames(DomEffectArray)[[2]]<-snpIDs
-   dimnames(DomEffectArray)[[3]]<-traits # t traits
 
-   # Discard burnIn
-   AddEffectArray<-AddEffectArray[-c(1:burnIn/thin),,]
-   DomEffectArray<-DomEffectArray[-c(1:burnIn/thin),,]
-
-   # 3D arrays of effects to lists-of-matrices (by trait)
-   # Center posterior distribution of effects
-   ## on posterior mean across MCMC samples
-   AddEffectArray<-array_branch(AddEffectArray,3) %>%
-      map(.,~scale(.,center = T, scale = F))
-   DomEffectArray<-array_branch(DomEffectArray,3) %>%
-      map(.,~scale(.,center = T, scale = F))
-
-   ## Get the posterior mean effects vectors
-   postMeanAddEffects<-map(AddEffectArray,~attr(.,which = "scaled:center"))
-   postMeanDomEffects<-map(DomEffectArray,~attr(.,which = "scaled:center"))
-
-   # For each cross
-   ## Predict means for each trait
-   means<-tibble(Trait=traits)
-   parents<-CrossesToPredict %$% union(sireID,damID)
-   doseMat<-doseMat[parents,names(postMeanAddEffects[[1]])]
-   ## Mean Breeding Value
-   crossMeanBV<-function(Trait,CrossesToPredict,doseMat,postMeanAddEffects){
-      parentGEBVs<-doseMat%*%postMeanAddEffects[[Trait]]
-      predictedCrossMeanBVs<-CrossesToPredict %>%
-         left_join(tibble(sireID=rownames(parentGEBVs),sireGEBV=as.numeric(parentGEBVs))) %>%
-         left_join(tibble(damID=rownames(parentGEBVs),damGEBV=as.numeric(parentGEBVs))) %>%
-         mutate(predMeanBV=(sireGEBV+damGEBV)/2)
-      return(predictedCrossMeanBVs) }
-   means %<>% mutate(predMeanBVs=map(Trait,crossMeanBV,CrossesToPredict,doseMat,postMeanAddEffects))
-   ## Mean total genetic value
-   ## G = sum( pr(AA)*a-pr(aa)*a+pr(Aa)*d )
-   ### where A is counted allele in dosages
-   crossMeanGV<-function(Trait,CrossesToPredict,doseMat,postMeanAddEffects,postMeanDomEffects){
-      predictedCrossMeanGVs<-CrossesToPredict %>%
-         mutate(predMeanGV=map2_dbl(sireID,damID,
-                                    function(sireID,damID){
-                                       p1<-doseMat[sireID,]/2
-                                       p2<-doseMat[damID,]/2
-                                       q1<-1-p1
-                                       q2<-1-p2
-                                       gfreqs<-cbind(q1*q2,p1*q2+p2*q1,p1*p2)
-
-                                       meanG<-sum((gfreqs[,3]-gfreqs[,1])*postMeanAddEffects[[Trait]]+gfreqs[,2]*postMeanDomEffects[[Trait]])
-                                       return(meanG)
-                                    }))
-      return(predictedCrossMeanGVs) }
-   means %<>% mutate(predMeanGVs=map(Trait,crossMeanGV,CrossesToPredict,doseMat,postMeanAddEffects,postMeanDomEffects))
-   means %<>%
-      select(Trait,predMeanBVs) %>%
-      unnest(predMeanBVs) %>%
-      left_join(means %>%
-                   select(Trait,predMeanGVs) %>%
-                   unnest(predMeanGVs)) %>%
-      nest(predMeans=c(-Trait))
-
-   rm(doseMat); gc()
-
-   ## Predict trait (co)variances
-   varcovars<-bind_rows(tibble(Trait1=traits,Trait2=traits), # trait variances
-                        combn(traits,2,simplify = T) %>% # covariances
-                           t(.) %>% #
-                           `colnames<-`(.,c("Trait1","Trait2")) %>%
-                           as_tibble)
-
-   haploMat<-haploMat[sort(c(paste0(parents,"_HapA"),paste0(parents,"_HapB"))),snpIDs]
-
-   # function to do one var-covar param for all crosses
-   runCrossPMVarAD<-function(Trait1,Trait2,CrossesToPredict,
-                             AddEffectArray,DomEffectArray,
-                             haploMat,recombFreqMat,outpath,outprefix,
-                             postMeanAddEffects,postMeanDomEffects,ncores,...){
-
-      starttime<-proc.time()[3]
-      # Posterior Sample Variance-Covariance Matrix of Marker Effects
-      postVarCovarOfAddEffects<-(1/(nrow(AddEffectArray[[Trait1]])-1))*crossprod(AddEffectArray[[Trait1]],AddEffectArray[[Trait2]])
-      postVarCovarOfDomEffects<-(1/(nrow(DomEffectArray[[Trait1]])-1))*crossprod(DomEffectArray[[Trait1]],DomEffectArray[[Trait2]])
-
-      rm(AddEffectArray,DomEffectArray); gc()
-
-      # function to do one var-covar param for one cross
-      predCrossPMVarAD<-function(Trait1,Trait2,sireID,damID,
-                                 haploMat,recombFreqMat,
-                                 postMeanAddEffects,postMeanDomEffects,
-                                 postVarCovarOfAddEffects,postVarCovarOfDomEffects,...){
-         starttime<-proc.time()[3]
-
-         # Before predicting variances
-         # check for and remove SNPs that
-         # won't segregate, i.e. are fixed in parents
-         ### hopes to save time / mem
-         x<-colSums(rbind(haploMat[grep(paste0(sireID,"_"),rownames(haploMat)),],
-                          haploMat[grep(paste0(damID,"_"),rownames(haploMat)),]))
-         segsnps2keep<-names(x[x>0 & x<4])
-
-         if(length(segsnps2keep)>0){
-            recombFreqMat<-recombFreqMat[segsnps2keep,segsnps2keep]
-            haploMat<-haploMat[sort(c(paste0(parents,"_HapA"),paste0(parents,"_HapB"))),segsnps2keep]
-            postMeanAddEffects<-map(postMeanAddEffects,~.[segsnps2keep])
-            postMeanDomEffects<-map(postMeanDomEffects,~.[segsnps2keep])
-            postVarCovarOfAddEffects<-postVarCovarOfAddEffects[segsnps2keep,segsnps2keep]
-            postVarCovarOfDomEffects<-postVarCovarOfDomEffects[segsnps2keep,segsnps2keep]
-
-            # sire and dam LD matrices
-            sireLD<-calcGameticLD(sireID,recombFreqMat,haploMat)
-            damLD<-calcGameticLD(damID,recombFreqMat,haploMat)
-            progenyLD<-sireLD+damLD
-
-            rm(recombFreqMat,haploMat,sireLD,damLD); gc()
-
-            ## Additive
-            #### (Co)Variance of Posterior Means
-            vpm_m2a<-postMeanAddEffects[[Trait1]]%*%progenyLD%*%postMeanAddEffects[[Trait2]]
-            #### Posterior Mean (Co)Variance
-            pmv_m2a<-vpm_m2a+sum(diag(progenyLD%*%postVarCovarOfAddEffects))
-            ## Dominance
-            #### (Co)Variance of Posterior Means
-            progenyLDsq<-progenyLD^2
-            vpm_m2d<-postMeanDomEffects[[Trait1]]%*%progenyLDsq%*%postMeanDomEffects[[Trait2]]
-            #### Posterior Mean (Co)Variance
-            pmv_m2d<-vpm_m2d+sum(diag(progenyLDsq%*%postVarCovarOfDomEffects))
-            totcomputetime<-proc.time()[3]-starttime
-
-            rm(progenyLDsq,progenyLD); gc()
-
-            ## Tidy the results
-            out<-tibble(VarComp=c("VarA","VarD"),
-                        VPM=c(vpm_m2a,vpm_m2d),
-                        PMV=c(pmv_m2a,pmv_m2d),
-                        Nsegsnps=c(length(segsnps2keep),NA),
-                        totcomputetime=c(totcomputetime,NA))
-            print(paste0("Variances predicted for family: ",sireID,"x",damID,"- took ",round(totcomputetime/60,3)," mins"))
-         } else {
-            out<-tibble(VarComp=c("VarA","VarD"),
-                        VPM=c(0,0),
-                        PMV=c(0,0),
-                        Nsegsnps=c(0,0),
-                        computetime=c(0,0))
-            print(paste0("Variances predicted for family: ",sireID,"x",damID,"- had no segregating SNPs"))
-         }
-         return(out)
-      }
-      require(furrr); options(mc.cores=ncores); plan(multiprocess)
-      predictedfamvars<-CrossesToPredict %>%
-         dplyr::mutate(predVars=future_pmap(.,
-                                            predCrossPMVarAD,
-                                            Trait1=Trait1,Trait2=Trait2,
-                                            haploMat=haploMat,recombFreqMat=recombFreqMat,
-                                            postMeanAddEffects=postMeanAddEffects,
-                                            postMeanDomEffects=postMeanDomEffects,
-                                            postVarCovarOfAddEffects=postVarCovarOfAddEffects,
-                                            postVarCovarOfDomEffects=postVarCovarOfDomEffects))
-      totcomputetime<-proc.time()[3]-starttime
-      print(paste0("Done predicting fam vars. ",
-                   "Took ",round((totcomputetime)/60,2),
-                   " mins for ",nrow(predictedfamvars)," families"))
-      predictedfamvars<-list(predictedfamvars=predictedfamvars,totcomputetime=totcomputetime)
-      saveRDS(predictedfamvars,file=here::here(outpath,paste0(outprefix,"_Component",Trait1,"_",Trait2,".rds")))
-      return(predictedfamvars) }
-   starttime<-proc.time()[3]
-
-   varcovars %<>%
-      mutate(varcomps=pmap(.,runCrossPMVarAD,CrossesToPredict,
-                           AddEffectArray,DomEffectArray,
-                           haploMat,recombFreqMat,outpath,outprefix,
-                           postMeanAddEffects,postMeanDomEffects,ncores))
-   totcomputetime<-proc.time()[3]-starttime
-   means_and_vars<-list(means=means,
-                        varcovars=varcovars,
-                        totcomputetime=totcomputetime)
-
-   saveRDS(means_and_vars,file=here::here(outpath,paste0(outprefix,"_predMeansAndVars.rds")))
-   return(means_and_vars)
-}
-
-#' runMultiTraitCrossPredA
-#'
-#' For a set of crosses, with an array of posterior marker effects for multiple traits for a purely additive model, predict the genetic means, (co)variances for all traits and all crosses.
-#' For prediction of variances, consider only segregating SNPs to save time and memory.
-#'
-#' @param outprefix
-#' @param outpath
-#' @param CrossesToPredict
-#' @param AddEffectArray
-#' @param traits
-#' @param snpIDs
-#' @param nIter
-#' @param burnIn
-#' @param thin
-#' @param haploMat
-#' @param doseMat
-#' @param recombFreqMat
-#' @param ncores
-#' @param ...
-#'
-#' @return
-#' @export
-#'
-#' @examples
-runMultiTraitCrossPredA<-function(outprefix=NULL,outpath=NULL,
-                                  CrossesToPredict,AddEffectArray,
-                                  traits, snpIDs, nIter, burnIn, thin,
-                                  haploMat,doseMat,recombFreqMat,ncores=1,...){
-   starttime<-proc.time()[3]
-   # Add dimnames
-   dimnames(AddEffectArray)[[2]]<-snpIDs
-   dimnames(AddEffectArray)[[3]]<-traits # t traits
-
-   # Discard burnIn
-   AddEffectArray<-AddEffectArray[-c(1:burnIn/thin),,]
-
-   # 3D arrays of effects to lists-of-matrices (by trait)
-   # Center posterior distribution of effects
-   ## on posterior mean across MCMC samples
-   AddEffectArray<-array_branch(AddEffectArray,3) %>%
-      map(.,~scale(.,center = T, scale = F))
-
-   ## Get the posterior mean effects vectors
-   postMeanAddEffects<-map(AddEffectArray,~attr(.,which = "scaled:center"))
-
-   # For each cross
-   ## Predict means for each trait
-   means<-tibble(Trait=traits)
-   parents<-CrossesToPredict %$% union(sireID,damID)
-   doseMat<-doseMat[parents,names(postMeanAddEffects[[1]])]
-   ## Mean Breeding Value
-   crossMeanBV<-function(Trait,CrossesToPredict,doseMat,postMeanAddEffects){
-      parentGEBVs<-doseMat%*%postMeanAddEffects[[Trait]]
-      predictedCrossMeanBVs<-CrossesToPredict %>%
-         left_join(tibble(sireID=rownames(parentGEBVs),sireGEBV=as.numeric(parentGEBVs))) %>%
-         left_join(tibble(damID=rownames(parentGEBVs),damGEBV=as.numeric(parentGEBVs))) %>%
-         mutate(predMeanBV=(sireGEBV+damGEBV)/2)
-      return(predictedCrossMeanBVs) }
-   means %<>% mutate(predMeanBVs=map(Trait,crossMeanBV,CrossesToPredict,doseMat,postMeanAddEffects))
-   means %<>%
-      select(Trait,predMeanBVs) %>%
-      unnest(predMeanBVs) %>%
-      nest(predMeans=c(-Trait))
-
-   rm(doseMat); gc()
-
-   ## Predict trait (co)variances
-   varcovars<-bind_rows(tibble(Trait1=traits,Trait2=traits), # trait variances
-                        combn(traits,2,simplify = T) %>% # covariances
-                           t(.) %>% #
-                           `colnames<-`(.,c("Trait1","Trait2")) %>%
-                           as_tibble)
-
-   haploMat<-haploMat[sort(c(paste0(parents,"_HapA"),paste0(parents,"_HapB"))),snpIDs]
-
-   # function to do one var-covar param for all crosses
-   runCrossPMVarA<-function(Trait1,Trait2,CrossesToPredict,
-                            AddEffectArray,
-                            haploMat,recombFreqMat,outpath,outprefix,
-                            postMeanAddEffects,ncores,...){
-
-      starttime<-proc.time()[3]
-      # Posterior Sample Variance-Covariance Matrix of Marker Effects
-      postVarCovarOfAddEffects<-(1/(nrow(AddEffectArray[[Trait1]])-1))*crossprod(AddEffectArray[[Trait1]],AddEffectArray[[Trait2]])
-
-      rm(AddEffectArray); gc()
-
-      # function to do one var-covar param for one cross
-      predCrossPMVarA<-function(Trait1,Trait2,sireID,damID,
-                                haploMat,recombFreqMat,
-                                postMeanAddEffects,
-                                postVarCovarOfAddEffects,...){
-         starttime<-proc.time()[3]
-
-         # Before predicting variances
-         # check for and remove SNPs that
-         # won't segregate, i.e. are fixed in parents
-         ### hopes to save time / mem
-         x<-colSums(rbind(haploMat[grep(paste0(sireID,"_"),rownames(haploMat)),],
-                          haploMat[grep(paste0(damID,"_"),rownames(haploMat)),]))
-         segsnps2keep<-names(x[x>0 & x<4])
-
-         if(length(segsnps2keep)>0){
-            recombFreqMat<-recombFreqMat[segsnps2keep,segsnps2keep]
-            haploMat<-haploMat[sort(c(paste0(parents,"_HapA"),paste0(parents,"_HapB"))),segsnps2keep]
-            postMeanAddEffects<-map(postMeanAddEffects,~.[segsnps2keep])
-            postVarCovarOfAddEffects<-postVarCovarOfAddEffects[segsnps2keep,segsnps2keep]
-
-            # sire and dam LD matrices
-            sireLD<-calcGameticLD(sireID,recombFreqMat,haploMat)
-            damLD<-calcGameticLD(damID,recombFreqMat,haploMat)
-            progenyLD<-sireLD+damLD
-
-            rm(recombFreqMat,haploMat,sireLD,damLD); gc()
-
-            ## Additive
-            #### (Co)Variance of Posterior Means
-            vpm_m2a<-postMeanAddEffects[[Trait1]]%*%progenyLD%*%postMeanAddEffects[[Trait2]]
-            #### Posterior Mean (Co)Variance
-            pmv_m2a<-vpm_m2a+sum(diag(progenyLD%*%postVarCovarOfAddEffects))
-
-            totcomputetime<-proc.time()[3]-starttime
-
-            rm(progenyLDsq,progenyLD); gc()
-
-            ## Tidy the results
-            out<-tibble(VarComp=c("VarA"),
-                        VPM=c(vpm_m2a),
-                        PMV=c(pmv_m2a),
-                        Nsegsnps=c(length(segsnps2keep)),
-                        totcomputetime=c(totcomputetime))
-            print(paste0("Variances predicted for family: ",sireID,"x",damID,"- took ",round(totcomputetime/60,3)," mins"))
-         } else {
-            out<-tibble(VarComp=c("VarA"),
-                        VPM=c(0),
-                        PMV=c(0),
-                        Nsegsnps=c(0),
-                        computetime=c(0))
-            print(paste0("Variances predicted for family: ",sireID,"x",damID,"- had no segregating SNPs"))
-         }
-         return(out)
-      }
-      require(furrr); options(mc.cores=ncores); plan(multiprocess)
-      predictedfamvars<-CrossesToPredict %>%
-         dplyr::mutate(predVars=future_pmap(.,
-                                            predCrossPMVarA,
-                                            Trait1=Trait1,Trait2=Trait2,
-                                            haploMat=haploMat,recombFreqMat=recombFreqMat,
-                                            postMeanAddEffects=postMeanAddEffects,
-                                            postVarCovarOfAddEffects=postVarCovarOfAddEffects))
-      totcomputetime<-proc.time()[3]-starttime
-      print(paste0("Done predicting fam vars. ",
-                   "Took ",round((totcomputetime)/60,2),
-                   " mins for ",nrow(predictedfamvars)," families"))
-      predictedfamvars<-list(predictedfamvars=predictedfamvars,totcomputetime=totcomputetime)
-      saveRDS(predictedfamvars,file=here::here(outpath,paste0(outprefix,"_Component",Trait1,"_",Trait2,".rds")))
-      return(predictedfamvars) }
-   starttime<-proc.time()[3]
-
-   varcovars %<>%
-      mutate(varcomps=pmap(.,runCrossPMVarA,CrossesToPredict,
-                           AddEffectArray,
-                           haploMat,recombFreqMat,outpath,outprefix,
-                           postMeanAddEffects,ncores))
-   totcomputetime<-proc.time()[3]-starttime
-   means_and_vars<-list(means=means,
-                        varcovars=varcovars,
-                        totcomputetime=totcomputetime)
-
-   saveRDS(means_and_vars,file=here::here(outpath,paste0(outprefix,"_predMeansAndVars.rds")))
-   return(means_and_vars)
-}
-
-
-
-#' runMultiTraitCrossPredADvpm
-#'
-#' For a set of crosses, with an array of posterior marker effects for multiple traits and a multi-component, namely an additive plus dominance model, predict the genetic means, (co)variances for all traits and all crosses.
-#' For prediction of variances, consider only segregating SNPs to save time and memory.
-#'
-#' @param outprefix
-#' @param outpath
-#' @param CrossesToPredict
-#' @param AddEffectArray
-#' @param DomEffectArray
-#' @param traits
-#' @param snpIDs
-#' @param nIter
-#' @param burnIn
-#' @param thin
-#' @param haploMat
-#' @param doseMat
-#' @param recombFreqMat
-#' @param ncores
-#' @param ...
-#'
-#' @return
-#' @export
-#'
-#' @examples
-runMultiTraitCrossPredADvpm<-function(outprefix=NULL,outpath=NULL,
-                                      CrossesToPredict,AddEffectArray,DomEffectArray,
-                                      traits, snpIDs, nIter, burnIn, thin,
-                                      haploMat,doseMat,recombFreqMat,ncores=1,...){
-   starttime<-proc.time()[3]
-   # Add dimnames
-   dimnames(AddEffectArray)[[2]]<-snpIDs
-   dimnames(AddEffectArray)[[3]]<-traits # t traits
-   dimnames(DomEffectArray)[[2]]<-snpIDs
-   dimnames(DomEffectArray)[[3]]<-traits # t traits
-
-   # Discard burnIn
-   AddEffectArray<-AddEffectArray[-c(1:burnIn/thin),,]
-   DomEffectArray<-DomEffectArray[-c(1:burnIn/thin),,]
-
-   # 3D arrays of effects to lists-of-matrices (by trait)
-   # Center posterior distribution of effects
-   ## on posterior mean across MCMC samples
-   AddEffectArray<-array_branch(AddEffectArray,3) %>%
-      map(.,~scale(.,center = T, scale = F))
-   DomEffectArray<-array_branch(DomEffectArray,3) %>%
-      map(.,~scale(.,center = T, scale = F))
-
-   ## Get the posterior mean effects vectors
-   postMeanAddEffects<-map(AddEffectArray,~attr(.,which = "scaled:center"))
-   postMeanDomEffects<-map(DomEffectArray,~attr(.,which = "scaled:center"))
-   rm(AddEffectArray,DomEffectArray); gc()
-
-   # For each cross
-   ## Predict means for each trait
-   means<-tibble(Trait=traits)
-   parents<-CrossesToPredict %$% union(sireID,damID)
-   doseMat<-doseMat[parents,names(postMeanAddEffects[[1]])]
-   ## Mean Breeding Value
-   crossMeanBV<-function(Trait,CrossesToPredict,doseMat,postMeanAddEffects){
-      parentGEBVs<-doseMat%*%postMeanAddEffects[[Trait]]
-      predictedCrossMeanBVs<-CrossesToPredict %>%
-         left_join(tibble(sireID=rownames(parentGEBVs),sireGEBV=as.numeric(parentGEBVs))) %>%
-         left_join(tibble(damID=rownames(parentGEBVs),damGEBV=as.numeric(parentGEBVs))) %>%
-         mutate(predMeanBV=(sireGEBV+damGEBV)/2)
-      return(predictedCrossMeanBVs) }
-   means %<>% mutate(predMeanBVs=map(Trait,crossMeanBV,CrossesToPredict,doseMat,postMeanAddEffects))
-   ## Mean total genetic value
-   ## G = sum( pr(AA)*a-pr(aa)*a+pr(Aa)*d )
-   ### where A is counted allele in dosages
-   crossMeanGV<-function(Trait,CrossesToPredict,doseMat,postMeanAddEffects,postMeanDomEffects){
-      predictedCrossMeanGVs<-CrossesToPredict %>%
-         mutate(predMeanGV=map2_dbl(sireID,damID,
-                                    function(sireID,damID){
-                                       p1<-doseMat[sireID,]/2
-                                       p2<-doseMat[damID,]/2
-                                       q1<-1-p1
-                                       q2<-1-p2
-                                       gfreqs<-cbind(q1*q2,p1*q2+p2*q1,p1*p2)
-
-                                       meanG<-sum((gfreqs[,3]-gfreqs[,1])*postMeanAddEffects[[Trait]]+gfreqs[,2]*postMeanDomEffects[[Trait]])
-                                       return(meanG)
-                                    }))
-      return(predictedCrossMeanGVs) }
-   means %<>% mutate(predMeanGVs=map(Trait,crossMeanGV,CrossesToPredict,doseMat,postMeanAddEffects,postMeanDomEffects))
-   means %<>%
-      select(Trait,predMeanBVs) %>%
-      unnest(predMeanBVs) %>%
-      left_join(means %>%
-                   select(Trait,predMeanGVs) %>%
-                   unnest(predMeanGVs)) %>%
-      nest(predMeans=c(-Trait))
-
-   rm(doseMat); gc()
-
-   ## Predict trait (co)variances
-   varcovars<-bind_rows(tibble(Trait1=traits,Trait2=traits), # trait variances
-                        combn(traits,2,simplify = T) %>% # covariances
-                           t(.) %>% #
-                           `colnames<-`(.,c("Trait1","Trait2")) %>%
-                           as_tibble)
-
-   haploMat<-haploMat[sort(c(paste0(parents,"_HapA"),paste0(parents,"_HapB"))),snpIDs]
-
-   # function to do one var-covar param for all crosses
-   runCrossVPM_AD<-function(Trait1,Trait2,CrossesToPredict,
-                            haploMat,recombFreqMat,outpath,outprefix,
-                            postMeanAddEffects,postMeanDomEffects,ncores,...){
-
-      starttime<-proc.time()[3]
-
-      # function to do one var-covar param for one cross
-      predCrossVPM_AD<-function(Trait1,Trait2,sireID,damID,
-                                 haploMat,recombFreqMat,
-                                 postMeanAddEffects,postMeanDomEffects,...){
-         starttime<-proc.time()[3]
-
-         # Before predicting variances
-         # check for and remove SNPs that
-         # won't segregate, i.e. are fixed in parents
-         ### hopes to save time / mem
-         x<-colSums(rbind(haploMat[grep(paste0(sireID,"_"),rownames(haploMat)),],
-                          haploMat[grep(paste0(damID,"_"),rownames(haploMat)),]))
-         segsnps2keep<-names(x[x>0 & x<4])
-
-         if(length(segsnps2keep)>0){
-            recombFreqMat<-recombFreqMat[segsnps2keep,segsnps2keep]
-            haploMat<-haploMat[sort(c(paste0(parents,"_HapA"),paste0(parents,"_HapB"))),segsnps2keep]
-            postMeanAddEffects<-map(postMeanAddEffects,~.[segsnps2keep])
-            postMeanDomEffects<-map(postMeanDomEffects,~.[segsnps2keep])
-
-            # sire and dam LD matrices
-            sireLD<-calcGameticLD(sireID,recombFreqMat,haploMat)
-            damLD<-calcGameticLD(damID,recombFreqMat,haploMat)
-            progenyLD<-sireLD+damLD
-
-            rm(recombFreqMat,haploMat,sireLD,damLD); gc()
-
-            ## Additive
-            #### (Co)Variance of Posterior Means
-            vpm_m2a<-postMeanAddEffects[[Trait1]]%*%progenyLD%*%postMeanAddEffects[[Trait2]]
-            ## Dominance
-            #### (Co)Variance of Posterior Means
-            progenyLDsq<-progenyLD^2
-            vpm_m2d<-postMeanDomEffects[[Trait1]]%*%progenyLDsq%*%postMeanDomEffects[[Trait2]]
-
-            totcomputetime<-proc.time()[3]-starttime
-
-            rm(progenyLDsq,progenyLD); gc()
-
-            ## Tidy the results
-            out<-tibble(VarComp=c("VarA","VarD"),
-                        VPM=c(vpm_m2a,vpm_m2d),
-                        Nsegsnps=c(length(segsnps2keep),NA),
-                        totcomputetime=c(totcomputetime,NA))
-            print(paste0("Variances predicted for family: ",sireID,"x",damID,"- took ",round(totcomputetime/60,3)," mins"))
-         } else {
-            out<-tibble(VarComp=c("VarA","VarD"),
-                        VPM=c(0,0),
-                        Nsegsnps=c(0,0),
-                        computetime=c(0,0))
-            print(paste0("Variances predicted for family: ",sireID,"x",damID,"- had no segregating SNPs"))
-         }
-         return(out)
-      }
-      require(furrr); options(mc.cores=ncores); plan(multiprocess)
-      predictedfamvars<-CrossesToPredict %>%
-         dplyr::mutate(predVars=future_pmap(.,
-                                            predCrossVPM_AD,
-                                            Trait1=Trait1,Trait2=Trait2,
-                                            haploMat=haploMat,recombFreqMat=recombFreqMat,
-                                            postMeanAddEffects=postMeanAddEffects,
-                                            postMeanDomEffects=postMeanDomEffects))
-      totcomputetime<-proc.time()[3]-starttime
-      print(paste0("Done predicting fam vars. ",
-                   "Took ",round((totcomputetime)/60,2),
-                   " mins for ",nrow(predictedfamvars)," families"))
-      predictedfamvars<-list(predictedfamvars=predictedfamvars,totcomputetime=totcomputetime)
-      saveRDS(predictedfamvars,file=here::here(outpath,paste0(outprefix,"_Component",Trait1,"_",Trait2,".rds")))
-      return(predictedfamvars) }
-   starttime<-proc.time()[3]
-
-   varcovars %<>%
-      mutate(varcomps=pmap(.,runCrossVPM_AD,CrossesToPredict,
-                           haploMat,recombFreqMat,outpath,outprefix,
-                           postMeanAddEffects,postMeanDomEffects,ncores))
-   totcomputetime<-proc.time()[3]-starttime
-   means_and_vars<-list(means=means,
-                        varcovars=varcovars,
-                        totcomputetime=totcomputetime)
-
-   saveRDS(means_and_vars,file=here::here(outpath,paste0(outprefix,"_predMeansAndVPMs.rds")))
-   return(means_and_vars)
-}
-
-
-
-#' runMultiTraitCrossPredAvpm
-#'
-#' For a set of crosses, with an array of posterior marker effects for multiple traits and a multi-component, namely an additive plus dominance model, predict the genetic means, (co)variances for all traits and all crosses.
-#' For prediction of variances, consider only segregating SNPs to save time and memory.
-#'
-#' @param outprefix
-#' @param outpath
-#' @param CrossesToPredict
-#' @param AddEffectArray
-#' @param traits
-#' @param snpIDs
-#' @param nIter
-#' @param burnIn
-#' @param thin
-#' @param haploMat
-#' @param doseMat
-#' @param recombFreqMat
-#' @param ncores
-#' @param ...
-#'
-#' @return
-#' @export
-#'
-#' @examples
-runMultiTraitCrossPredAvpm<-function(outprefix=NULL,outpath=NULL,
-                                      CrossesToPredict,AddEffectArray,
-                                      traits, snpIDs, nIter, burnIn, thin,
-                                      haploMat,doseMat,recombFreqMat,ncores=1,...){
-   starttime<-proc.time()[3]
-   # Add dimnames
-   dimnames(AddEffectArray)[[2]]<-snpIDs
-   dimnames(AddEffectArray)[[3]]<-traits # t traits
-
-   # Discard burnIn
-   AddEffectArray<-AddEffectArray[-c(1:burnIn/thin),,]
-
-   # 3D arrays of effects to lists-of-matrices (by trait)
-   # Center posterior distribution of effects
-   ## on posterior mean across MCMC samples
-   AddEffectArray<-array_branch(AddEffectArray,3) %>%
-      map(.,~scale(.,center = T, scale = F))
-
-   ## Get the posterior mean effects vectors
-   postMeanAddEffects<-map(AddEffectArray,~attr(.,which = "scaled:center"))
-   rm(AddEffectArray); gc()
-
-   # For each cross
-   ## Predict means for each trait
-   means<-tibble(Trait=traits)
-   parents<-CrossesToPredict %$% union(sireID,damID)
-   doseMat<-doseMat[parents,names(postMeanAddEffects[[1]])]
-   ## Mean Breeding Value
-   crossMeanBV<-function(Trait,CrossesToPredict,doseMat,postMeanAddEffects){
-      parentGEBVs<-doseMat%*%postMeanAddEffects[[Trait]]
-      predictedCrossMeanBVs<-CrossesToPredict %>%
-         left_join(tibble(sireID=rownames(parentGEBVs),sireGEBV=as.numeric(parentGEBVs))) %>%
-         left_join(tibble(damID=rownames(parentGEBVs),damGEBV=as.numeric(parentGEBVs))) %>%
-         mutate(predMeanBV=(sireGEBV+damGEBV)/2)
-      return(predictedCrossMeanBVs) }
-   means %<>% mutate(predMeanBVs=map(Trait,crossMeanBV,CrossesToPredict,doseMat,postMeanAddEffects))
-   means %<>%
-      select(Trait,predMeanBVs) %>%
-      unnest(predMeanBVs) %>%
-      nest(predMeans=c(-Trait))
-
-   rm(doseMat); gc()
-
-   ## Predict trait (co)variances
-   varcovars<-bind_rows(tibble(Trait1=traits,Trait2=traits), # trait variances
-                        combn(traits,2,simplify = T) %>% # covariances
-                           t(.) %>% #
-                           `colnames<-`(.,c("Trait1","Trait2")) %>%
-                           as_tibble)
-
-   haploMat<-haploMat[sort(c(paste0(parents,"_HapA"),paste0(parents,"_HapB"))),snpIDs]
-
-   # function to do one var-covar param for all crosses
-   runCrossVPM_A<-function(Trait1,Trait2,CrossesToPredict,
-                            haploMat,recombFreqMat,outpath,outprefix,
-                            postMeanAddEffects,ncores,...){
-
-      starttime<-proc.time()[3]
-
-      # function to do one var-covar param for one cross
-      predCrossVPM_A<-function(Trait1,Trait2,sireID,damID,
-                                haploMat,recombFreqMat,
-                                postMeanAddEffects,...){
-         starttime<-proc.time()[3]
-
-         # Before predicting variances
-         # check for and remove SNPs that
-         # won't segregate, i.e. are fixed in parents
-         ### hopes to save time / mem
-         x<-colSums(rbind(haploMat[grep(paste0(sireID,"_"),rownames(haploMat)),],
-                          haploMat[grep(paste0(damID,"_"),rownames(haploMat)),]))
-         segsnps2keep<-names(x[x>0 & x<4])
-
-         if(length(segsnps2keep)>0){
-            recombFreqMat<-recombFreqMat[segsnps2keep,segsnps2keep]
-            haploMat<-haploMat[sort(c(paste0(parents,"_HapA"),paste0(parents,"_HapB"))),segsnps2keep]
-            postMeanAddEffects<-map(postMeanAddEffects,~.[segsnps2keep])
-
-            # sire and dam LD matrices
-            sireLD<-calcGameticLD(sireID,recombFreqMat,haploMat)
-            damLD<-calcGameticLD(damID,recombFreqMat,haploMat)
-            progenyLD<-sireLD+damLD
-
-            rm(recombFreqMat,haploMat,sireLD,damLD); gc()
-
-            ## Additive
-            #### (Co)Variance of Posterior Means
-            vpm_m2a<-postMeanAddEffects[[Trait1]]%*%progenyLD%*%postMeanAddEffects[[Trait2]]
-
-            totcomputetime<-proc.time()[3]-starttime
-
-            rm(progenyLD); gc()
-
-            ## Tidy the results
-            out<-tibble(VarComp=c("VarA"),
-                        VPM=c(vpm_m2a),
-                        Nsegsnps=c(length(segsnps2keep)),
-                        totcomputetime=c(totcomputetime))
-            print(paste0("Variances predicted for family: ",sireID,"x",damID,"- took ",round(totcomputetime/60,3)," mins"))
-         } else {
-            out<-tibble(VarComp=c("VarA"),
-                        VPM=c(0),
-                        Nsegsnps=c(0),
-                        computetime=c(0))
-            print(paste0("Variances predicted for family: ",sireID,"x",damID,"- had no segregating SNPs"))
-         }
-         return(out)
-      }
-      require(furrr); options(mc.cores=ncores); plan(multiprocess)
-      predictedfamvars<-CrossesToPredict %>%
-         dplyr::mutate(predVars=future_pmap(.,
-                                            predCrossVPM_A,
-                                            Trait1=Trait1,Trait2=Trait2,
-                                            haploMat=haploMat,recombFreqMat=recombFreqMat,
-                                            postMeanAddEffects=postMeanAddEffects))
-      totcomputetime<-proc.time()[3]-starttime
-      print(paste0("Done predicting fam vars. ",
-                   "Took ",round((totcomputetime)/60,2),
-                   " mins for ",nrow(predictedfamvars)," families"))
-      predictedfamvars<-list(predictedfamvars=predictedfamvars,totcomputetime=totcomputetime)
-      saveRDS(predictedfamvars,file=here::here(outpath,paste0(outprefix,"_Component",Trait1,"_",Trait2,".rds")))
-      return(predictedfamvars) }
-   starttime<-proc.time()[3]
-
-   varcovars %<>%
-      mutate(varcomps=pmap(.,runCrossVPM_A,CrossesToPredict,
-                           haploMat,recombFreqMat,outpath,outprefix,
-                           postMeanAddEffects,ncores))
-   totcomputetime<-proc.time()[3]-starttime
-   means_and_vars<-list(means=means,
-                        varcovars=varcovars,
-                        totcomputetime=totcomputetime)
-
-   saveRDS(means_and_vars,file=here::here(outpath,paste0(outprefix,"_predMeansAndVPMs.rds")))
-   return(means_and_vars)
-}

@@ -220,7 +220,7 @@ getMultiTraitPMVs_AD<-function(AddEffectList, DomEffectList, genoVarCovarMat){
                            as_tibble)
 
    # Compute over each variance parameter
-    varcovars %<>%
+   varcovars %<>%
       mutate(varcomps=pmap(.,posteriorMeanVarCovarAD,AddEffectList,DomEffectList,postMeanAddEffects,postMeanDomEffects)) %>%
       unnest(varcomps)
    return(varcovars)
@@ -350,9 +350,9 @@ predCrossMeansAD<-function(CrossesToPredict,postMeanAddEffects,postMeanDomEffect
 #'
 #' @examples
 predOneCrossVarA<-function(Trait1,Trait2,sireID,damID,
-                            haploMat,recombFreqMat,predType="VPM",
-                            postMeanAddEffects,
-                            postVarCovarOfAddEffects=NULL,...){
+                           haploMat,recombFreqMat,predType="VPM",
+                           postMeanAddEffects,
+                           postVarCovarOfAddEffects=NULL,...){
    starttime<-proc.time()[3]
 
    # Before predicting variances
@@ -509,10 +509,10 @@ predOneCrossVarAD<-function(Trait1,Trait2,sireID,damID,
 #'
 #' @examples
 predCrossVarsA<-function(Trait1,Trait2,CrossesToPredict,predType="VPM",
-                          haploMat,recombFreqMat,
-                          postMeanAddEffects,
-                          AddEffectList=NULL,
-                          ncores=1,...){
+                         haploMat,recombFreqMat,
+                         postMeanAddEffects,
+                         AddEffectList=NULL,
+                         ncores=1,...){
 
    starttime<-proc.time()[3]
    if(predType=="PMV"){
@@ -573,11 +573,11 @@ predCrossVarsAD<-function(Trait1,Trait2,CrossesToPredict,predType="VPM",
       # Posterior Sample Variance-Covariance Matrix of Marker Effects
       postVarCovarOfAddEffects<-(1/(nrow(AddEffectList[[Trait1]])-1))*crossprod(AddEffectList[[Trait1]],AddEffectList[[Trait2]])
       postVarCovarOfDomEffects<-(1/(nrow(DomEffectList[[Trait1]])-1))*crossprod(DomEffectList[[Trait1]],DomEffectList[[Trait2]])
-   rm(AddEffectList,DomEffectList); gc()
+      rm(AddEffectList,DomEffectList); gc()
    } else {
       postVarCovarOfAddEffects<-NULL;
       postVarCovarOfDomEffects<-NULL;
-      }
+   }
 
    require(furrr); options(mc.cores=ncores); plan(multiprocess)
    predictedfamvars<-CrossesToPredict %>%
@@ -596,7 +596,7 @@ predCrossVarsAD<-function(Trait1,Trait2,CrossesToPredict,predType="VPM",
                 " mins for ",nrow(predictedfamvars)," families"))
    predictedfamvars<-list(predictedfamvars=predictedfamvars,totcomputetime=totcomputetime)
    return(predictedfamvars)
-   }
+}
 
 
 #' runMtCrossVarPredsA
@@ -619,8 +619,8 @@ predCrossVarsAD<-function(Trait1,Trait2,CrossesToPredict,predType="VPM",
 #'
 #' @examples
 runMtCrossVarPredsA<-function(outprefix=NULL,outpath=NULL,predType="VPM",
-                               CrossesToPredict,AddEffectList,
-                               haploMat,recombFreqMat,ncores=1,...){
+                              CrossesToPredict,AddEffectList,
+                              haploMat,recombFreqMat,ncores=1,...){
    starttime<-proc.time()[3]
    traits<-names(AddEffectList)
    parents<-CrossesToPredict %$% union(sireID,damID)
@@ -639,7 +639,7 @@ runMtCrossVarPredsA<-function(outprefix=NULL,outpath=NULL,predType="VPM",
                            `colnames<-`(.,c("Trait1","Trait2")) %>%
                            as_tibble)
 
-   haploMat<-haploMat[sort(c(paste0(parents,"_HapA"),paste0(parents,"_HapB"))),snpIDs]
+   haploMat<-haploMat[sort(c(paste0(parents,"_HapA"),paste0(parents,"_HapB"))),]
 
    if(predType!="PMV"){
       AddEffectList<-NULL;
@@ -703,7 +703,7 @@ runMtCrossVarPredsAD<-function(outprefix=NULL,outpath=NULL,predType="VPM",
                            `colnames<-`(.,c("Trait1","Trait2")) %>%
                            as_tibble)
 
-   haploMat<-haploMat[sort(c(paste0(parents,"_HapA"),paste0(parents,"_HapB"))),snpIDs]
+   haploMat<-haploMat[sort(c(paste0(parents,"_HapA"),paste0(parents,"_HapB"))),]
 
    if(predType!="PMV"){
       AddEffectList<-NULL;

@@ -7,12 +7,12 @@
 runMtCrossVarPredsA(
   outprefix = NULL,
   outpath = NULL,
-  predType = "VPM",
+  predType,
   CrossesToPredict,
   AddEffectList,
   haploMat,
   recombFreqMat,
-  ncores = 1,
+  ncores,
   ...
 )
 }

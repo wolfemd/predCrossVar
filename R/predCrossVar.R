@@ -350,7 +350,7 @@ predCrossMeansAD<-function(CrossesToPredict,postMeanAddEffects,postMeanDomEffect
 #'
 #' @examples
 predOneCrossVarA<-function(Trait1,Trait2,sireID,damID,
-                           haploMat,recombFreqMat,predType="VPM",
+                           haploMat,recombFreqMat,predType,
                            postMeanAddEffects,
                            postVarCovarOfAddEffects=NULL,...){
    starttime<-proc.time()[3]
@@ -365,6 +365,7 @@ predOneCrossVarA<-function(Trait1,Trait2,sireID,damID,
 
    if(length(segsnps2keep)>0){
       recombFreqMat<-recombFreqMat[segsnps2keep,segsnps2keep]
+      parents<-c(sireID,damID)
       haploMat<-haploMat[sort(c(paste0(parents,"_HapA"),paste0(parents,"_HapB"))),segsnps2keep]
       postMeanAddEffects<-map(postMeanAddEffects,~.[segsnps2keep])
       if(predType=="PMV"){
@@ -426,7 +427,7 @@ predOneCrossVarA<-function(Trait1,Trait2,sireID,damID,
 #'
 #' @examples
 predOneCrossVarAD<-function(Trait1,Trait2,sireID,damID,
-                            haploMat,recombFreqMat,predType="VPM",
+                            haploMat,recombFreqMat,predType,
                             postMeanAddEffects,postMeanDomEffects,
                             postVarCovarOfAddEffects=NULL,postVarCovarOfDomEffects=NULL,...){
    starttime<-proc.time()[3]
@@ -441,6 +442,7 @@ predOneCrossVarAD<-function(Trait1,Trait2,sireID,damID,
 
    if(length(segsnps2keep)>0){
       recombFreqMat<-recombFreqMat[segsnps2keep,segsnps2keep]
+      parents<-c(sireID,damID)
       haploMat<-haploMat[sort(c(paste0(parents,"_HapA"),paste0(parents,"_HapB"))),segsnps2keep]
       postMeanAddEffects<-map(postMeanAddEffects,~.[segsnps2keep])
       postMeanDomEffects<-map(postMeanDomEffects,~.[segsnps2keep])
@@ -508,24 +510,23 @@ predOneCrossVarAD<-function(Trait1,Trait2,sireID,damID,
 #' @export
 #'
 #' @examples
-predCrossVarsA<-function(Trait1,Trait2,CrossesToPredict,predType="VPM",
+predCrossVarsA<-function(Trait1,Trait2,CrossesToPredict,predType,
                          haploMat,recombFreqMat,
                          postMeanAddEffects,
                          AddEffectList=NULL,
-                         ncores=1,...){
+                         ncores,...){
 
    starttime<-proc.time()[3]
    if(predType=="PMV"){
       # Posterior Sample Variance-Covariance Matrix of Marker Effects
       postVarCovarOfAddEffects<-(1/(nrow(AddEffectList[[Trait1]])-1))*crossprod(AddEffectList[[Trait1]],AddEffectList[[Trait2]])
-      rm(AddEffectList); gc()
+      #rm(AddEffectList); gc()
    } else {
       postVarCovarOfAddEffects<-NULL;
    }
 
    require(furrr); options(mc.cores=ncores); plan(multiprocess)
    predictedfamvars<-CrossesToPredict %>%
-      slice(1:15) %>%
       dplyr::mutate(predVars=future_pmap(.,
                                          predOneCrossVarA,
                                          Trait1=Trait1,Trait2=Trait2,
@@ -563,18 +564,18 @@ predCrossVarsA<-function(Trait1,Trait2,CrossesToPredict,predType="VPM",
 #' @export
 #'
 #' @examples
-predCrossVarsAD<-function(Trait1,Trait2,CrossesToPredict,predType="VPM",
+predCrossVarsAD<-function(Trait1,Trait2,CrossesToPredict,predType,
                           haploMat,recombFreqMat,
                           postMeanAddEffects,postMeanDomEffects,
                           AddEffectList=NULL,DomEffectList=NULL,
-                          ncores=1,...){
+                          ncores,...){
 
    starttime<-proc.time()[3]
    if(predType=="PMV"){
       # Posterior Sample Variance-Covariance Matrix of Marker Effects
       postVarCovarOfAddEffects<-(1/(nrow(AddEffectList[[Trait1]])-1))*crossprod(AddEffectList[[Trait1]],AddEffectList[[Trait2]])
       postVarCovarOfDomEffects<-(1/(nrow(DomEffectList[[Trait1]])-1))*crossprod(DomEffectList[[Trait1]],DomEffectList[[Trait2]])
-      rm(AddEffectList,DomEffectList); gc()
+      #rm(AddEffectList,DomEffectList); gc()
    } else {
       postVarCovarOfAddEffects<-NULL;
       postVarCovarOfDomEffects<-NULL;
@@ -619,9 +620,9 @@ predCrossVarsAD<-function(Trait1,Trait2,CrossesToPredict,predType="VPM",
 #' @export
 #'
 #' @examples
-runMtCrossVarPredsA<-function(outprefix=NULL,outpath=NULL,predType="VPM",
+runMtCrossVarPredsA<-function(outprefix=NULL,outpath=NULL,predType,
                               CrossesToPredict,AddEffectList,
-                              haploMat,recombFreqMat,ncores=1,...){
+                              haploMat,recombFreqMat,ncores,...){
    starttime<-proc.time()[3]
    traits<-names(AddEffectList)
    parents<-CrossesToPredict %$% union(sireID,damID)
@@ -681,9 +682,9 @@ runMtCrossVarPredsA<-function(outprefix=NULL,outpath=NULL,predType="VPM",
 #' @export
 #'
 #' @examples
-runMtCrossVarPredsAD<-function(outprefix=NULL,outpath=NULL,predType="VPM",
+runMtCrossVarPredsAD<-function(outprefix=NULL,outpath=NULL,predType,
                                CrossesToPredict,AddEffectList,DomEffectList,
-                               haploMat,recombFreqMat,ncores=1,...){
+                               haploMat,recombFreqMat,ncores,...){
    starttime<-proc.time()[3]
    traits<-names(AddEffectList)
    parents<-CrossesToPredict %$% union(sireID,damID)

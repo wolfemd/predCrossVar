@@ -11,7 +11,7 @@ predOneCrossVarA(
   damID,
   haploMat,
   recombFreqMat,
-  predType = "VPM",
+  predType,
   postMeanAddEffects,
   postVarCovarOfAddEffects = NULL,
   ...

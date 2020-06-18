@@ -8,12 +8,12 @@ predCrossVarsA(
   Trait1,
   Trait2,
   CrossesToPredict,
-  predType = "VPM",
+  predType,
   haploMat,
   recombFreqMat,
   postMeanAddEffects,
   AddEffectList = NULL,
-  ncores = 1,
+  ncores,
   ...
 )
 }

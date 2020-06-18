@@ -525,7 +525,6 @@ predCrossVarsA<-function(Trait1,Trait2,CrossesToPredict,predType="VPM",
 
    require(furrr); options(mc.cores=ncores); plan(multiprocess)
    predictedfamvars<-CrossesToPredict %>%
-      slice(1:15) %>%
       dplyr::mutate(predVars=future_pmap(.,
                                          predOneCrossVarA,
                                          Trait1=Trait1,Trait2=Trait2,

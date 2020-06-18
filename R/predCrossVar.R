@@ -384,7 +384,7 @@ predOneCrossVarA<-function(Trait1,Trait2,sireID,damID,
       if(predType=="PMV"){ pmv_m2a<-vpm_m2a+sum(diag(progenyLD%*%postVarCovarOfAddEffects)) }
       totcomputetime<-proc.time()[3]-starttime
 
-      rm(progenyLDsq,progenyLD); gc()
+      rm(progenyLD); gc()
 
       ## Tidy the results
       out<-tibble(VarComp=c("VarA"),
@@ -525,6 +525,7 @@ predCrossVarsA<-function(Trait1,Trait2,CrossesToPredict,predType="VPM",
 
    require(furrr); options(mc.cores=ncores); plan(multiprocess)
    predictedfamvars<-CrossesToPredict %>%
+      slice(1:15) %>%
       dplyr::mutate(predVars=future_pmap(.,
                                          predOneCrossVarA,
                                          Trait1=Trait1,Trait2=Trait2,
@@ -646,10 +647,10 @@ runMtCrossVarPredsA<-function(outprefix=NULL,outpath=NULL,predType="VPM",
    }
 
    varcovars %<>%
-      mutate(varcomps=pmap(.,predCrossVarsA,CrossesToPredict,predType=predType,
-                           AddEffectList,
-                           haploMat,recombFreqMat,
-                           postMeanAddEffects,ncores))
+      mutate(varcomps=pmap(.,predCrossVarsA,CrossesToPredict=CrossesToPredict,predType=predType,
+                           AddEffectList=AddEffectList,
+                           haploMat=haploMat,recombFreqMat=recombFreqMat,
+                           postMeanAddEffects=postMeanAddEffects,ncores=ncores))
 
    totcomputetime<-proc.time()[3]-starttime
    varcovars<-list(varcovars=varcovars,
@@ -711,10 +712,10 @@ runMtCrossVarPredsAD<-function(outprefix=NULL,outpath=NULL,predType="VPM",
    }
 
    varcovars %<>%
-      mutate(varcomps=pmap(.,predCrossVarsAD,CrossesToPredict,predType=predType,
-                           AddEffectList,DomEffectList,
-                           haploMat,recombFreqMat,
-                           postMeanAddEffects,postMeanDomEffects,ncores))
+      mutate(varcomps=pmap(.,predCrossVarsAD,CrossesToPredict=CrossesToPredict,predType=predType,
+                           AddEffectList=AddEffectList,DomEffectList=DomEffectList,
+                           haploMat=haploMat,recombFreqMat=recombFreqMat,
+                           postMeanAddEffects=postMeanAddEffects,postMeanDomEffects=postMeanDomEffects,ncores=ncores))
 
    totcomputetime<-proc.time()[3]-starttime
    varcovars<-list(varcovars=varcovars,

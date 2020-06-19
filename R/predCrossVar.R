@@ -177,7 +177,10 @@ getMultiTraitPMVs_A<-function(AddEffectList, genoVarCovarMat){
 
    # Compute over each variance parameter
    varcovars %<>%
-      mutate(varcomps=pmap(.,posteriorMeanVarCovarA,AddEffectList,postMeanAddEffects)) %>%
+      mutate(varcomps=pmap(.,posteriorMeanVarCovarA,
+                           AddEffectList=AddEffectList,
+                           postMeanAddEffects=postMeanAddEffects,
+                           genoVarCovarMat=genoVarCovarMat)) %>%
       unnest(varcomps)
    return(varcovars)
 }
@@ -221,7 +224,12 @@ getMultiTraitPMVs_AD<-function(AddEffectList, DomEffectList, genoVarCovarMat){
 
    # Compute over each variance parameter
    varcovars %<>%
-      mutate(varcomps=pmap(.,posteriorMeanVarCovarAD,AddEffectList,DomEffectList,postMeanAddEffects,postMeanDomEffects)) %>%
+      mutate(varcomps=pmap(.,posteriorMeanVarCovarAD,
+                           AddEffectList=AddEffectList,
+                           DomEffectList=DomEffectList,
+                           postMeanAddEffects=postMeanAddEffects,
+                           postMeanDomEffects=postMeanDomEffects,
+                           genoVarCovarMat=genoVarCovarMat)) %>%
       unnest(varcomps)
    return(varcovars)
 }

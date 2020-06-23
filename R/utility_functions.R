@@ -231,3 +231,28 @@ calcGameticLD<-function(parentGID,recombFreqMat,haploMat){
       # D<-recombFreqMat*(crossprod(scale(X,scale = F))/2)
       return(D)
 }
+
+#' crosses2predict
+#'
+#' Make a data.frame of all pairwise matings given a vector of parent IDs.
+#' Include selfs. No reciprocal crosses, i.e. use as male == use as female.
+#' Diagonal and upper-triangle of mating matrix.
+#'
+#' @param parents
+#'
+#' @return tibble, two columns, sireID and damID, all pairwise crosses (see details).
+#' @export
+#'
+#' @examples
+crosses2predict<-function(parents){
+      CrossesToPredict<-matrix(NA,nrow=length(parents),ncol=length(parents))
+      CrossesToPredict[upper.tri(CrossesToPredict,diag = T)]<-1
+      rownames(CrossesToPredict)<-colnames(CrossesToPredict)<-parents
+      CrossesToPredict %<>%
+            as.data.frame %>%
+            rownames_to_column(var = "sireID") %>%
+            pivot_longer(cols = (-sireID), names_to = "damID", values_to = "keep") %>%
+            filter(keep==1) %>%
+            select(-keep)
+      return(CrossesToPredict)
+}

@@ -256,3 +256,15 @@ crosses2predict<-function(parents){
             select(-keep)
       return(CrossesToPredict)
 }
+
+#' intensity
+#'
+#' Compute the standardized selection intensity from the proportion selection.
+#'
+#' @param propSel proportion selection
+#'
+#' @return
+#' @export
+#'
+#' @examples
+intensity<-function(propSel){ dnorm(qnorm(1-propSel))/propSel } # standardized selection intensity

@@ -261,7 +261,11 @@ predCrossMeanBVsOneTrait<-function(Trait,CrossesToPredict,doseMat,postMeanAddEff
 #'
 #' Predict the total genetic merit of the cross based on a model with additive+dominance marker effects.
 #' For each family , for a single trait, given  parental allelic dosages and (posterior mean) marker effects.
-#' G = sum( pr(AA)*a-pr(aa)*a+pr(Aa)*d ), where A is counted allele in dosages
+#' Eqn. 14.6 Falconer+MacKay, and elsewhere
+#' G = sum( 𝑎(𝑝 − 𝑞 − 𝑦) + 𝑑[2𝑝𝑞 + 𝑦(𝑝 − 𝑞)] )
+#' a and d being the additive and dominance effects
+#' p and q being the allele frequencies of one parent
+#' y is the difference of freq. between the two parents
 #'
 #' @param Trait string, label of trait (name in list of postMeanAddEffects) to compute
 #' @param CrossesToPredict data.frame or tibble, col/colnames: sireID, damID. sireID and damID must both be in the haploMat.
@@ -277,13 +281,18 @@ predCrossMeanGVsOneTrait<-function(Trait,CrossesToPredict,doseMat,postMeanAddEff
    predictedCrossMeanGVs<-CrossesToPredict %>%
       mutate(predMeanGV=map2_dbl(sireID,damID,
                                  function(sireID,damID){
+                                    # Eqn 14.6 from Falconer+MacKay
                                     p1<-doseMat[sireID,]/2
                                     p2<-doseMat[damID,]/2
-                                    q1<-1-p1
-                                    q2<-1-p2
-                                    gfreqs<-cbind(q1*q2,p1*q2+p2*q1,p1*p2)
-
-                                    meanG<-sum((gfreqs[,3]-gfreqs[,1])*postMeanAddEffects[[Trait]]+gfreqs[,2]*postMeanDomEffects[[Trait]])
+                                    q<-1-p1
+                                    y<-p1-p2
+                                    g<-postMeanAddEffects[[Trait]]*(p1-q-y) + postMeanDomEffects[[Trait]]*((2*p1*q)+y*(p1-q))
+                                    meanG<-sum(g)
+                                    # Equivalent, e.g. Toro & Varona 2010
+                                    # q1<-1-p1
+                                    # q2<-1-p2
+                                    # gfreqs<-cbind(q1*q2,p1*q2+p2*q1,p1*p2)
+                                    # meanG<-sum((gfreqs[,3]-gfreqs[,1])*postMeanAddEffects[[Trait]]+gfreqs[,2]*postMeanDomEffects[[Trait]])
                                     return(meanG)
                                  }))
    return(predictedCrossMeanGVs) }
@@ -316,7 +325,10 @@ predCrossMeansA<-function(CrossesToPredict,postMeanAddEffects,doseMat){
 #'
 #' From an additive+dominance model, fit to multiple traits, predict the total genetic merit of each cross for each trait.
 #' For each family , for a single trait, given  parental allelic dosages and (posterior mean) marker effects.
-#' G = sum( pr(AA)*a-pr(aa)*a+pr(Aa)*d ), where A is counted allele in dosages
+#' G = sum( 𝑎(𝑝 − 𝑞 − 𝑦) + 𝑑[2𝑝𝑞 + 𝑦(𝑝 − 𝑞)] )
+#' a and d being the additive and dominance effects
+#' p and q being the allele frequencies of one parent
+#' y is the difference of freq. between the two parents
 #'
 #' @param CrossesToPredict data.frame or tibble, col/colnames: sireID, damID. sireID and damID must both be in the haploMat.
 #' @param postMeanAddEffects list of named vectors (or column matrices) with the posterior mean ADDITIVE marker effects.

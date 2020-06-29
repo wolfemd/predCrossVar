@@ -29,5 +29,9 @@ tibble with predicted mean GV for each family
 \description{
 Predict the total genetic merit of the cross based on a model with additive+dominance marker effects.
 For each family , for a single trait, given  parental allelic dosages and (posterior mean) marker effects.
-G = sum( pr(AA)*a-pr(aa)*a+pr(Aa)*d ), where A is counted allele in dosages
+Eqn. 14.6 Falconer+MacKay, and elsewhere
+G = sum( 𝑎(𝑝 − 𝑞 − 𝑦) + 𝑑[2𝑝𝑞 + 𝑦(𝑝 − 𝑞)] )
+a and d being the additive and dominance effects
+p and q being the allele frequencies of one parent
+y is the difference of freq. between the two parents
 }

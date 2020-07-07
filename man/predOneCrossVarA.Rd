@@ -12,8 +12,8 @@ predOneCrossVarA(
   haploMat,
   recombFreqMat,
   predType,
-  postMeanAddEffects,
-  postVarCovarOfAddEffects = NULL,
+  postMeanAlleleSubEffects,
+  postVarCovarOfAlleleSubEffects = NULL,
   ...
 )
 }
@@ -32,9 +32,9 @@ predOneCrossVarA(
 
 \item{predType}{string, "VPM" or "PMV". Default = "VPM" for variance of posterior means, this is faster but expected to be less accurate / more biased than the alternative predType=="PMV". PMV requires user to supply a variance-covariance matrix of effects estimates.}
 
-\item{postMeanAddEffects}{list of named vectors (or column matrices) with the posterior mean ADDITIVE marker effects.}
+\item{postMeanAlleleSubEffects}{list of named vectors (or column matrices) with the posterior mean ALLELE SUBSTITUTION marker effects.}
 
-\item{postVarCovarOfAddEffects}{matrix of dimension N SNP x N SNP. ADDITIVE Posterior Sample Variance-Covariance Matrix of Marker Effects Estimates.}
+\item{postVarCovarOfAlleleSubEffects}{matrix of dimension N SNP x N SNP. ALLELE SUBSTITUTION Posterior Sample Variance-Covariance Matrix of Marker Effects Estimates.}
 
 \item{...}{}
 }

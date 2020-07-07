@@ -44,4 +44,6 @@ runMtCrossVarPredsAD(
 \description{
 Predict the additive and dominance variances _and_ covariances for a set of crosses, potentially in parallel across families.
 Wraps predCrossVarsAD across variance parameters.
+The output predicted variances should be suitable to
+compute predVar(TGV) = predVar(A) + predVar(D).
 }

@@ -9,7 +9,7 @@ runMtCrossVarPredsA(
   outpath = NULL,
   predType,
   CrossesToPredict,
-  AddEffectList,
+  AlleleSubEffectList,
   haploMat,
   recombFreqMat,
   ncores,
@@ -25,7 +25,7 @@ runMtCrossVarPredsA(
 
 \item{CrossesToPredict}{data.frame or tibble, col/colnames: sireID, damID. sireID and damID must both be in the haploMat.}
 
-\item{AddEffectList}{list of ADDITIVE effect matrices, one matrix per trait, Each element of the list is named with a string identifying the trait and the colnames of each matrix are labelled with snpIDs.}
+\item{AlleleSubEffectList}{list of ALLELE SUBSTITUTION EFFECT matrices, one matrix per trait, Each element of the list is named with a string identifying the trait and the colnames of each matrix are labelled with snpIDs.}
 
 \item{haploMat}{matrix of phased haplotypes, 2 rows per sample, cols = loci, {0,1}, rownames assumed to contain GIDs with a suffix, separated by "_" to distinguish haplotypes}
 
@@ -39,6 +39,10 @@ runMtCrossVarPredsA(
 
 }
 \description{
-Predict the additive variances _and_ covariances for a set of crosses, potentially in parallel across families.
-Wraps predCrossVarsAD across variance parameters.
+Predict the variances _and_ covariances for a set of crosses in terms of BVs (breeding values).
+Potentially in parallel across families.
+Wraps predCrossVarsA across variance parameters.
+NOTE: Marker effects should represent allele substitution effects.
+Either by fitting an additive-only model OR an genotypic-partitioned additive+dominance model,
+with allele sub effects computed as a+d(q-p), where q and p are allele freqs in the training pop. used.
 }

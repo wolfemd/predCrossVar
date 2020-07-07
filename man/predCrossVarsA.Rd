@@ -11,8 +11,8 @@ predCrossVarsA(
   predType,
   haploMat,
   recombFreqMat,
-  postMeanAddEffects,
-  AddEffectList = NULL,
+  postMeanAlleleSubEffects,
+  AlleleSubEffectList = NULL,
   ncores,
   ...
 )
@@ -30,9 +30,9 @@ predCrossVarsA(
 
 \item{recombFreqMat}{a square symmetric matrix with values = (1-2*c1), where c1=matrix of expected recomb. frequencies. The choice to do 1-2c1 outside the function was made for computation efficiency; every operation on a big matrix takes time.}
 
-\item{postMeanAddEffects}{list of named vectors (or column matrices) with the posterior mean ADDITIVE marker effects.}
+\item{postMeanAlleleSubEffects}{list of named vectors (or column matrices) with the posterior mean ALLELE SUBSTITUTION marker effects.}
 
-\item{AddEffectList}{list of ADDITIVE effect matrices, one matrix per trait, Each element of the list is named with a string identifying the trait and the colnames of each matrix are labelled with snpIDs.}
+\item{AlleleSubEffectList}{list of ALLELE SUBSTITUTION EFFECT matrices, one matrix per trait, Each element of the list is named with a string identifying the trait and the colnames of each matrix are labelled with snpIDs.}
 
 \item{ncores}{If ncores set > 1 parallelizes across families, but beware it is memory intensive and options(future.globals.maxSize=___) may need to be adjusted.}
 
@@ -44,4 +44,7 @@ list with two elements, "predictedfamvars" contains a tibble with all prediction
 \description{
 Predict the additive variance or co-variance for a set of crosses, potentially in parallel across families.
 Wraps predOneCrossVarA across families.
+NOTE: Marker effects should represent allele substitution effects.
+Either by fitting an additive-only model OR an genotypic-partitioned additive+dominance model,
+with allele sub effects computed as a+d(q-p), where q and p are allele freqs in the training pop. used.
 }

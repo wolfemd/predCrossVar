@@ -365,8 +365,8 @@ predCrossMeanTGVs<-function(CrossesToPredict,postMeanAddEffects,postMeanDomEffec
 #' @param haploMat matrix of phased haplotypes, 2 rows per sample, cols = loci, {0,1}, rownames assumed to contain GIDs with a suffix, separated by "_" to distinguish haplotypes
 #' @param recombFreqMat a square symmetric matrix with values = (1-2*c1), where c1=matrix of expected recomb. frequencies. The choice to do 1-2c1 outside the function was made for computation efficiency; every operation on a big matrix takes time.
 #' @param predType string, "VPM" or "PMV". Default = "VPM" for variance of posterior means, this is faster but expected to be less accurate / more biased than the alternative predType=="PMV". PMV requires user to supply a variance-covariance matrix of effects estimates.
-#' @param postMeanAddEffects list of named vectors (or column matrices) with the posterior mean ADDITIVE marker effects.
-#' @param postVarCovarOfAddEffects matrix of dimension N SNP x N SNP. ADDITIVE Posterior Sample Variance-Covariance Matrix of Marker Effects Estimates.
+#' @param postMeanAlleleSubEffects list of named vectors (or column matrices) with the posterior mean ALLELE SUBSTITUTION marker effects.
+#' @param postVarCovarOfAlleleSubEffects matrix of dimension N SNP x N SNP. ALLELE SUBSTITUTION Posterior Sample Variance-Covariance Matrix of Marker Effects Estimates.
 #' @param ...
 #'
 #' @return tibble with predicted additive variance for one cross, one variance parameter
@@ -375,8 +375,8 @@ predCrossMeanTGVs<-function(CrossesToPredict,postMeanAddEffects,postMeanDomEffec
 #' @examples
 predOneCrossVarA<-function(Trait1,Trait2,sireID,damID,
                            haploMat,recombFreqMat,predType,
-                           postMeanAddEffects,
-                           postVarCovarOfAddEffects=NULL,...){
+                           postMeanAlleleSubEffects,
+                           postVarCovarOfAlleleSubEffects=NULL,...){
    starttime<-proc.time()[3]
 
    # Before predicting variances
@@ -391,9 +391,9 @@ predOneCrossVarA<-function(Trait1,Trait2,sireID,damID,
       recombFreqMat<-recombFreqMat[segsnps2keep,segsnps2keep]
       parents<-c(sireID,damID)
       haploMat<-haploMat[sort(c(paste0(parents,"_HapA"),paste0(parents,"_HapB"))),segsnps2keep]
-      postMeanAddEffects<-map(postMeanAddEffects,~.[segsnps2keep])
+      postMeanAlleleSubEffects<-map(postMeanAlleleSubEffects,~.[segsnps2keep])
       if(predType=="PMV"){
-         postVarCovarOfAddEffects<-postVarCovarOfAddEffects[segsnps2keep,segsnps2keep]
+         postVarCovarOfAlleleSubEffects<-postVarCovarOfAlleleSubEffects[segsnps2keep,segsnps2keep]
       }
       # sire and dam LD matrices
       sireLD<-calcGameticLD(sireID,recombFreqMat,haploMat)
@@ -404,9 +404,9 @@ predOneCrossVarA<-function(Trait1,Trait2,sireID,damID,
 
       ## Additive
       #### (Co)Variance of Posterior Means
-      vpm_m2a<-postMeanAddEffects[[Trait1]]%*%progenyLD%*%postMeanAddEffects[[Trait2]]
+      vpm_m2a<-postMeanAlleleSubEffects[[Trait1]]%*%progenyLD%*%postMeanAlleleSubEffects[[Trait2]]
       #### Posterior Mean (Co)Variance
-      if(predType=="PMV"){ pmv_m2a<-vpm_m2a+sum(diag(progenyLD%*%postVarCovarOfAddEffects)) }
+      if(predType=="PMV"){ pmv_m2a<-vpm_m2a+sum(diag(progenyLD%*%postVarCovarOfAlleleSubEffects)) }
       totcomputetime<-proc.time()[3]-starttime
 
       rm(progenyLD); gc()
@@ -518,6 +518,10 @@ predOneCrossVarAD<-function(Trait1,Trait2,sireID,damID,
 #'
 #' Predict the additive variance or co-variance for a set of crosses, potentially in parallel across families.
 #' Wraps predOneCrossVarA across families.
+#' NOTE: Marker effects should represent allele substitution effects.
+#' Either by fitting an additive-only model OR an genotypic-partitioned additive+dominance model,
+#' with allele sub effects computed as a+d(q-p), where q and p are allele freqs in the training pop. used.
+
 #'
 #' @param Trait1 string, label for Trait1. When Trait1==Trait2 computes the genomic variance of the trait, when Trait1!=Trait2 computes the genomic covariance between traits.
 #' @param Trait2 string, label for Trait2. When Trait1==Trait2 computes the genomic variance of the trait, when Trait1!=Trait2 computes the genomic covariance between traits.
@@ -525,8 +529,8 @@ predOneCrossVarAD<-function(Trait1,Trait2,sireID,damID,
 #' @param predType string, "VPM" or "PMV". Default = "VPM" for variance of posterior means, this is faster but expected to be less accurate / more biased than the alternative predType=="PMV". PMV requires user to supply a variance-covariance matrix of effects estimates.
 #' @param haploMat matrix of phased haplotypes, 2 rows per sample, cols = loci, {0,1}, rownames assumed to contain GIDs with a suffix, separated by "_" to distinguish haplotypes
 #' @param recombFreqMat a square symmetric matrix with values = (1-2*c1), where c1=matrix of expected recomb. frequencies. The choice to do 1-2c1 outside the function was made for computation efficiency; every operation on a big matrix takes time.
-#' @param postMeanAddEffects list of named vectors (or column matrices) with the posterior mean ADDITIVE marker effects.
-#' @param AddEffectList list of ADDITIVE effect matrices, one matrix per trait, Each element of the list is named with a string identifying the trait and the colnames of each matrix are labelled with snpIDs.
+#' @param postMeanAlleleSubEffects list of named vectors (or column matrices) with the posterior mean ALLELE SUBSTITUTION marker effects.
+#' @param AlleleSubEffectList list of ALLELE SUBSTITUTION EFFECT matrices, one matrix per trait, Each element of the list is named with a string identifying the trait and the colnames of each matrix are labelled with snpIDs.
 #' @param ncores If ncores set > 1 parallelizes across families, but beware it is memory intensive and options(future.globals.maxSize=___) may need to be adjusted.
 #' @param ...
 #'
@@ -536,17 +540,17 @@ predOneCrossVarAD<-function(Trait1,Trait2,sireID,damID,
 #' @examples
 predCrossVarsA<-function(Trait1,Trait2,CrossesToPredict,predType,
                          haploMat,recombFreqMat,
-                         postMeanAddEffects,
-                         AddEffectList=NULL,
+                         postMeanAlleleSubEffects,
+                         AlleleSubEffectList=NULL,
                          ncores,...){
 
    starttime<-proc.time()[3]
    if(predType=="PMV"){
       # Posterior Sample Variance-Covariance Matrix of Marker Effects
-      postVarCovarOfAddEffects<-(1/(nrow(AddEffectList[[Trait1]])-1))*crossprod(AddEffectList[[Trait1]],AddEffectList[[Trait2]])
+      postVarCovarOfAlleleSubEffects<-(1/(nrow(AlleleSubEffectList[[Trait1]])-1))*crossprod(AlleleSubEffectList[[Trait1]],AlleleSubEffectList[[Trait2]])
       #rm(AddEffectList); gc()
    } else {
-      postVarCovarOfAddEffects<-NULL;
+      postVarCovarOfAlleleSubEffects<-NULL;
    }
 
    require(furrr); options(mc.cores=ncores); plan(multiprocess)
@@ -556,8 +560,8 @@ predCrossVarsA<-function(Trait1,Trait2,CrossesToPredict,predType,
                                          Trait1=Trait1,Trait2=Trait2,
                                          haploMat=haploMat,recombFreqMat=recombFreqMat,
                                          predType=predType,
-                                         postMeanAddEffects=postMeanAddEffects,
-                                         postVarCovarOfAddEffects=postVarCovarOfAddEffects))
+                                         postMeanAlleleSubEffects=postMeanAlleleSubEffects,
+                                         postVarCovarOfAlleleSubEffects=postVarCovarOfAlleleSubEffects))
    totcomputetime<-proc.time()[3]-starttime
    print(paste0("Done predicting fam vars. ",
                 "Took ",round((totcomputetime)/60,2),
@@ -627,14 +631,18 @@ predCrossVarsAD<-function(Trait1,Trait2,CrossesToPredict,predType,
 
 #' runMtCrossVarPredsA
 #'
-#' Predict the additive variances _and_ covariances for a set of crosses, potentially in parallel across families.
-#' Wraps predCrossVarsAD across variance parameters.
+#' Predict the variances _and_ covariances for a set of crosses in terms of BVs (breeding values).
+#' Potentially in parallel across families.
+#' Wraps predCrossVarsA across variance parameters.
+#' NOTE: Marker effects should represent allele substitution effects.
+#' Either by fitting an additive-only model OR an genotypic-partitioned additive+dominance model,
+#' with allele sub effects computed as a+d(q-p), where q and p are allele freqs in the training pop. used.
 #'
 #' @param outprefix string, prefix for *.rds file to be written to disk with output. DEFAULT = NULL (no disk write)
 #' @param outpath string, path to disk location where files should be written. Can be left DEFAULT = NULL (no disk write)
 #' @param predType string, "VPM" or "PMV". Default = "VPM" for variance of posterior means, this is faster but expected to be less accurate / more biased than the alternative predType=="PMV". PMV requires user to supply a variance-covariance matrix of effects estimates.
 #' @param CrossesToPredict data.frame or tibble, col/colnames: sireID, damID. sireID and damID must both be in the haploMat.
-#' @param AddEffectList list of ADDITIVE effect matrices, one matrix per trait, Each element of the list is named with a string identifying the trait and the colnames of each matrix are labelled with snpIDs.
+#' @param AlleleSubEffectList list of ALLELE SUBSTITUTION EFFECT matrices, one matrix per trait, Each element of the list is named with a string identifying the trait and the colnames of each matrix are labelled with snpIDs.
 #' @param haploMat matrix of phased haplotypes, 2 rows per sample, cols = loci, {0,1}, rownames assumed to contain GIDs with a suffix, separated by "_" to distinguish haplotypes
 #' @param recombFreqMat a square symmetric matrix with values = (1-2*c1), where c1=matrix of expected recomb. frequencies. The choice to do 1-2c1 outside the function was made for computation efficiency; every operation on a big matrix takes time.
 #' @param ncores If ncores set > 1 parallelizes across families, but beware it is memory intensive and options(future.globals.maxSize=___) may need to be adjusted.
@@ -645,18 +653,18 @@ predCrossVarsAD<-function(Trait1,Trait2,CrossesToPredict,predType,
 #'
 #' @examples
 runMtCrossVarPredsA<-function(outprefix=NULL,outpath=NULL,predType,
-                              CrossesToPredict,AddEffectList,
+                              CrossesToPredict,AlleleSubEffectList,
                               haploMat,recombFreqMat,ncores,...){
    starttime<-proc.time()[3]
-   traits<-names(AddEffectList)
+   traits<-names(AlleleSubEffectList)
    parents<-CrossesToPredict %$% union(sireID,damID)
 
    # Center posterior distribution of effects
    ## on posterior mean across MCMC samples
-   AddEffectList %<>% map(.,~scale(.,center = T, scale = F))
+   AlleleSubEffectList %<>% map(.,~scale(.,center = T, scale = F))
 
    ## Get the posterior mean effects vectors
-   postMeanAddEffects<-map(AddEffectList,~attr(.,which = "scaled:center"))
+   postMeanAlleleSubEffects<-map(AlleleSubEffectList,~attr(.,which = "scaled:center"))
 
    ## Predict trait (co)variances
    varcovars<-bind_rows(tibble(Trait1=traits,Trait2=traits), # trait variances
@@ -668,20 +676,20 @@ runMtCrossVarPredsA<-function(outprefix=NULL,outpath=NULL,predType,
    haploMat<-haploMat[sort(c(paste0(parents,"_HapA"),paste0(parents,"_HapB"))),]
 
    if(predType!="PMV"){
-      AddEffectList<-NULL;
+      AlleleSubEffectList<-NULL;
    }
 
    varcovars %<>%
       mutate(varcomps=pmap(.,predCrossVarsA,CrossesToPredict=CrossesToPredict,predType=predType,
-                           AddEffectList=AddEffectList,
+                           AlleleSubEffectList=AlleleSubEffectList,
                            haploMat=haploMat,recombFreqMat=recombFreqMat,
-                           postMeanAddEffects=postMeanAddEffects,ncores=ncores))
+                           postMeanAlleleSubEffects=postMeanAlleleSubEffects,ncores=ncores))
 
    totcomputetime<-proc.time()[3]-starttime
    varcovars<-list(varcovars=varcovars,
                    totcomputetime=totcomputetime)
    if(!is.null(outprefix) & !is.null(outpath)){
-      saveRDS(varcovars,file=here::here(outpath,paste0(outprefix,"_predVarsAndCovars.rds")))
+      saveRDS(varcovars,file=here::here(outpath,paste0(outprefix,"_predVarAndCovarBVs.rds")))
    }
    return(varcovars)
 }
@@ -690,6 +698,8 @@ runMtCrossVarPredsA<-function(outprefix=NULL,outpath=NULL,predType,
 #'
 #' Predict the additive and dominance variances _and_ covariances for a set of crosses, potentially in parallel across families.
 #' Wraps predCrossVarsAD across variance parameters.
+#' The output predicted variances should be suitable to
+#' compute predVar(TGV) = predVar(A) + predVar(D).
 #'
 #' @param outprefix string, prefix for *.rds file to be written to disk with output. DEFAULT = NULL (no disk write)
 #' @param outpath string, path to disk location where files should be written. Can be left DEFAULT = NULL (no disk write)

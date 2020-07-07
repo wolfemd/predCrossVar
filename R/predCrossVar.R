@@ -236,19 +236,22 @@ getMultiTraitPMVs_AD<-function(AddEffectList, DomEffectList, genoVarCovarMat){
 
 #' predCrossMeanBVsOneTrait
 #'
-#' Predict the mean breeding value of each family, for a single trait, given parental allelic dosages and (posterior mean) marker effects.
-#' Should from an additive-only model.
+#' Predict the mean breeding value of each family, for a single trait, given parental allelic dosages
+#' and (posterior mean) marker effects.
+#' NOTE: Marker effects should represent allele substitution effects.
+#' Either by fitting an additive-only model OR an genotypic-partitioned additive+dominance model,
+#' with allele sub effects computed as a+d(q-p), where q and p are allele freqs in the training pop. used.
 #'
 #' @param Trait string, label of trait (name in list of postMeanAddEffects) to compute
 #' @param CrossesToPredict data.frame or tibble, col/colnames: sireID, damID. sireID and damID must both be in the haploMat.
 #' @param doseMat dosage matrix. Assumes SNPs in M coded 0, 1, 2 (requires rounding dosages to integers). M is Nind x Mrow, numeric matrix, with row/colnames to indicate SNP/ind ID
-#' @param postMeanAddEffects list of named vectors (or column matrices) with the posterior mean ADDITIVE marker effects.
+#' @param postMeanAlleleSubEffects list of named vectors (or column matrices) with the posterior mean ALLELE SUBSTITUTION marker effects.
 #'
 #' @return tibble with parental GEBV and the pred Mean GEBV (mean of parents) for each cross.
 #' @export
 #'
 #' @examples
-predCrossMeanBVsOneTrait<-function(Trait,CrossesToPredict,doseMat,postMeanAddEffects){
+predCrossMeanBVsOneTrait<-function(Trait,CrossesToPredict,doseMat,postMeanAlleleSubEffects){
    parentGEBVs<-doseMat%*%postMeanAddEffects[[Trait]]
    predictedCrossMeanBVs<-CrossesToPredict %>%
       left_join(tibble(sireID=rownames(parentGEBVs),sireGEBV=as.numeric(parentGEBVs))) %>%
@@ -277,7 +280,8 @@ predCrossMeanBVsOneTrait<-function(Trait,CrossesToPredict,doseMat,postMeanAddEff
 #' @export
 #'
 #' @examples
-predCrossMeanGVsOneTrait<-function(Trait,CrossesToPredict,doseMat,postMeanAddEffects,postMeanDomEffects){
+predCrossMeanGVsOneTrait<-function(Trait,CrossesToPredict,doseMat,
+                                   postMeanAddEffects,postMeanDomEffects){
    predictedCrossMeanGVs<-CrossesToPredict %>%
       mutate(predMeanGV=map2_dbl(sireID,damID,
                                  function(sireID,damID){
@@ -297,31 +301,31 @@ predCrossMeanGVsOneTrait<-function(Trait,CrossesToPredict,doseMat,postMeanAddEff
                                  }))
    return(predictedCrossMeanGVs) }
 
-#' predCrossMeansA
+#' predCrossMeanBVs
 #'
 #' From an additive only model, fit to multiple traits, predict the mean (breeding value) of each cross for each trait.
 #' Corresponds to the mean GEBV of the parents, given  parental allelic dosages and (posterior mean) marker effects.
 #'
 #' @param CrossesToPredict data.frame or tibble, col/colnames: sireID, damID. sireID and damID must both be in the haploMat.
-#' @param postMeanAddEffects list of named vectors (or column matrices) with the posterior mean ADDITIVE marker effects.
+#' @param postMeanAlleleSubEffects list of named vectors (or column matrices) with the posterior mean ALLELE SUBSTITUTION marker effects.
 #' @param doseMat dosage matrix. Assumes SNPs in M coded 0, 1, 2 (requires rounding dosages to integers). M is Nind x Mrow, numeric matrix, with row/colnames to indicate SNP/ind ID
 #'
 #' @return tibble with predicted mean BV for each trait in each family
 #' @export
 #'
 #' @examples
-predCrossMeansA<-function(CrossesToPredict,postMeanAddEffects,doseMat){
-   means<-tibble(Trait=names(postMeanAddEffects))
+predCrossMeanBVs<-function(CrossesToPredict,postMeanAlleleSubEffects,doseMat){
+   means<-tibble(Trait=names(postMeanAlleleSubEffects))
    parents<-CrossesToPredict %$% union(sireID,damID)
-   doseMat<-doseMat[parents,names(postMeanAddEffects[[1]])]
+   doseMat<-doseMat[parents,names(postMeanAlleleSubEffects[[1]])]
    ## Predicted Mean Total Merit
    means %<>%
-      mutate(predMeanBVs=map(Trait,predCrossMeanBVsOneTrait,CrossesToPredict,doseMat,postMeanAddEffects)) %>%
+      mutate(predMeanBVs=map(Trait,predCrossMeanBVsOneTrait,CrossesToPredict,doseMat,postMeanAlleleSubEffects)) %>%
       select(Trait,predMeanBVs) %>%
       unnest(predMeanBVs)
    return(means) }
 
-#' predCrossMeansAD
+#' predCrossMeanTGVs
 #'
 #' From an additive+dominance model, fit to multiple traits, predict the total genetic merit of each cross for each trait.
 #' For each family , for a single trait, given  parental allelic dosages and (posterior mean) marker effects.
@@ -339,7 +343,7 @@ predCrossMeansA<-function(CrossesToPredict,postMeanAddEffects,doseMat){
 #' @export
 #'
 #' @examples
-predCrossMeansAD<-function(CrossesToPredict,postMeanAddEffects,postMeanDomEffects,doseMat){
+predCrossMeanTGVs<-function(CrossesToPredict,postMeanAddEffects,postMeanDomEffects,doseMat){
    means<-tibble(Trait=names(postMeanAddEffects))
    parents<-CrossesToPredict %$% union(sireID,damID)
    doseMat<-doseMat[parents,names(postMeanAddEffects[[1]])]

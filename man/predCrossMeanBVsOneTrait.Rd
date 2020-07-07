@@ -4,7 +4,12 @@
 \alias{predCrossMeanBVsOneTrait}
 \title{predCrossMeanBVsOneTrait}
 \usage{
-predCrossMeanBVsOneTrait(Trait, CrossesToPredict, doseMat, postMeanAddEffects)
+predCrossMeanBVsOneTrait(
+  Trait,
+  CrossesToPredict,
+  doseMat,
+  postMeanAlleleSubEffects
+)
 }
 \arguments{
 \item{Trait}{string, label of trait (name in list of postMeanAddEffects) to compute}
@@ -13,12 +18,15 @@ predCrossMeanBVsOneTrait(Trait, CrossesToPredict, doseMat, postMeanAddEffects)
 
 \item{doseMat}{dosage matrix. Assumes SNPs in M coded 0, 1, 2 (requires rounding dosages to integers). M is Nind x Mrow, numeric matrix, with row/colnames to indicate SNP/ind ID}
 
-\item{postMeanAddEffects}{list of named vectors (or column matrices) with the posterior mean ADDITIVE marker effects.}
+\item{postMeanAlleleSubEffects}{list of named vectors (or column matrices) with the posterior mean ALLELE SUBSTITUTION marker effects.}
 }
 \value{
 tibble with parental GEBV and the pred Mean GEBV (mean of parents) for each cross.
 }
 \description{
-Predict the mean breeding value of each family, for a single trait, given parental allelic dosages and (posterior mean) marker effects.
-Should from an additive-only model.
+Predict the mean breeding value of each family, for a single trait, given parental allelic dosages
+and (posterior mean) marker effects.
+NOTE: Marker effects should represent allele substitution effects.
+Either by fitting an additive-only model OR an genotypic-partitioned additive+dominance model,
+with allele sub effects computed as a+d(q-p), where q and p are allele freqs in the training pop. used.
 }

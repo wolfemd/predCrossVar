@@ -298,9 +298,9 @@ crosses2predict<-function(parents){
       CrossesToPredict %<>%
             as.data.frame %>%
             rownames_to_column(var = "sireID") %>%
-            pivot_longer(cols = (-sireID), names_to = "damID", values_to = "keep") %>%
-            filter(keep==1) %>%
-            select(-keep)
+            dplyr::pivot_longer(cols = (-sireID), names_to = "damID", values_to = "keep") %>%
+            dplyr::filter(keep==1) %>%
+            dplyr::select(-keep)
       return(CrossesToPredict)
 }
 

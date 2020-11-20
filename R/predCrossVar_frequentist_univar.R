@@ -95,12 +95,12 @@ predCrossVarA<-function(sireID,damID,addEffects,
             totcomputetime<-proc.time()[3]-starttime
             gc() #gcend
             # output predicted add and dom vars for current family
-            out<-tibble(varA=predAdd,
+            out<-tibble::tibble(varA=predAdd,
                         segsnps=list(segsnps2keep),
                         computetime=totcomputetime)
             print(paste0("Variances predicted for family: ",sireID,"x",damID,"- took ",round(totcomputetime/60,3)," mins"))
       } else {
-            out<-tibble(varA=0,
+            out<-tibble::tibble(varA=0,
                         segsnps=list(),
                         computetime=0)
             print(paste0("Variances predicted for family: ",sireID,"x",damID,"- had no segregating SNPs"))
@@ -154,13 +154,13 @@ predCrossVarAD<-function(sireID,damID,addEffects,domEffects,
             totcomputetime<-proc.time()[3]-starttime
             gc() #gcend
             # output predicted add and dom vars for current family
-            out<-tibble(varA=predAdd,
+            out<-tibble::tibble(varA=predAdd,
                         varD=predDom,
                         segsnps=list(segsnps2keep),
                         computetime=totcomputetime)
             print(paste0("Variances predicted for family: ",sireID,"x",damID,"- took ",round(totcomputetime/60,3)," mins"))
       } else {
-            out<-tibble(varA=0,
+            out<-tibble::tibble(varA=0,
                         varD=0,
                         segsnps=list(),
                         computetime=0)

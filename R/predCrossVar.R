@@ -412,14 +412,14 @@ predOneCrossVarA<-function(Trait1,Trait2,sireID,damID,
       rm(progenyLD); gc()
 
       ## Tidy the results
-      out<-tibble(VarComp=c("VarA"),
+      out<-tibble::tibble(VarComp=c("VarA"),
                   VPM=c(vpm_m2a),
                   PMV=ifelse(predType=="PMV",c(pmv_m2a),c(NA)),
                   Nsegsnps=c(length(segsnps2keep)),
                   totcomputetime=c(totcomputetime))
       print(paste0("Variances predicted for family: ",sireID,"x",damID,"- took ",round(totcomputetime/60,3)," mins"))
    } else {
-      out<-tibble(VarComp=c("VarA"),
+      out<-tibble::tibble(VarComp=c("VarA"),
                   VPM=c(0),
                   PMV=c(0),
                   Nsegsnps=c(0),
@@ -497,14 +497,14 @@ predOneCrossVarAD<-function(Trait1,Trait2,sireID,damID,
       rm(progenyLDsq,progenyLD); gc()
 
       ## Tidy the results
-      out<-tibble(VarComp=c("VarA","VarD"),
+      out<-tibble::tibble(VarComp=c("VarA","VarD"),
                   VPM=c(vpm_m2a,vpm_m2d),
                   PMV=ifelse(predType=="PMV",c(pmv_m2a,pmv_m2d),c(NA,NA)),
                   Nsegsnps=c(length(segsnps2keep),NA),
                   totcomputetime=c(totcomputetime,NA))
       print(paste0("Variances predicted for family: ",sireID,"x",damID,"- took ",round(totcomputetime/60,3)," mins"))
    } else {
-      out<-tibble(VarComp=c("VarA","VarD"),
+      out<-tibble::tibble(VarComp=c("VarA","VarD"),
                   VPM=c(0,0),
                   PMV=c(0,0),
                   Nsegsnps=c(0,0),
@@ -555,7 +555,7 @@ predCrossVarsA<-function(Trait1,Trait2,CrossesToPredict,predType,
 
    require(furrr); options(mc.cores=ncores); plan(multisession)
    predictedfamvars<-CrossesToPredict %>%
-      dplyr::mutate(predVars=future_pmap(.,
+      dplyr::mutate(predVars=furrr::future_pmap(.,
                                          predOneCrossVarA,
                                          Trait1=Trait1,Trait2=Trait2,
                                          haploMat=haploMat,recombFreqMat=recombFreqMat,
@@ -661,13 +661,13 @@ runMtCrossVarPredsA<-function(outprefix=NULL,outpath=NULL,predType,
 
    # Center posterior distribution of effects
    ## on posterior mean across MCMC samples
-   AlleleSubEffectList %<>% map(.,~scale(.,center = T, scale = F))
+   AlleleSubEffectList %<>% purrr::map(.,~scale(.,center = T, scale = F))
 
    ## Get the posterior mean effects vectors
-   postMeanAlleleSubEffects<-map(AlleleSubEffectList,~attr(.,which = "scaled:center"))
+   postMeanAlleleSubEffects<-purrr::map(AlleleSubEffectList,~attr(.,which = "scaled:center"))
 
    ## Predict trait (co)variances
-   varcovars<-bind_rows(tibble(Trait1=traits,Trait2=traits), # trait variances
+   varcovars<-bind_rows(tibble::tibble(Trait1=traits,Trait2=traits), # trait variances
                         combn(traits,2,simplify = T) %>% # covariances
                            t(.) %>% #
                            `colnames<-`(.,c("Trait1","Trait2")) %>%
@@ -680,7 +680,7 @@ runMtCrossVarPredsA<-function(outprefix=NULL,outpath=NULL,predType,
    }
 
    varcovars %<>%
-      mutate(varcomps=pmap(.,predCrossVarsA,CrossesToPredict=CrossesToPredict,predType=predType,
+      mutate(varcomps=purrr::pmap(.,predCrossVarsA,CrossesToPredict=CrossesToPredict,predType=predType,
                            AlleleSubEffectList=AlleleSubEffectList,
                            haploMat=haploMat,recombFreqMat=recombFreqMat,
                            postMeanAlleleSubEffects=postMeanAlleleSubEffects,ncores=ncores))
@@ -725,15 +725,15 @@ runMtCrossVarPredsAD<-function(outprefix=NULL,outpath=NULL,predType,
 
    # Center posterior distribution of effects
    ## on posterior mean across MCMC samples
-   AddEffectList %<>% map(.,~scale(.,center = T, scale = F))
-   DomEffectList %<>% map(.,~scale(.,center = T, scale = F))
+   AddEffectList %<>% purrr::map(.,~scale(.,center = T, scale = F))
+   DomEffectList %<>% purrr::map(.,~scale(.,center = T, scale = F))
 
    ## Get the posterior mean effects vectors
-   postMeanAddEffects<-map(AddEffectList,~attr(.,which = "scaled:center"))
-   postMeanDomEffects<-map(DomEffectList,~attr(.,which = "scaled:center"))
+   postMeanAddEffects<-purrr::map(AddEffectList,~attr(.,which = "scaled:center"))
+   postMeanDomEffects<-purrr::map(DomEffectList,~attr(.,which = "scaled:center"))
 
    ## Predict trait (co)variances
-   varcovars<-bind_rows(tibble(Trait1=traits,Trait2=traits), # trait variances
+   varcovars<-bind_rows(tibble::tibble(Trait1=traits,Trait2=traits), # trait variances
                         combn(traits,2,simplify = T) %>% # covariances
                            t(.) %>% #
                            `colnames<-`(.,c("Trait1","Trait2")) %>%
@@ -747,7 +747,7 @@ runMtCrossVarPredsAD<-function(outprefix=NULL,outpath=NULL,predType,
    }
 
    varcovars %<>%
-      mutate(varcomps=pmap(.,predCrossVarsAD,CrossesToPredict=CrossesToPredict,predType=predType,
+      mutate(varcomps=purrr::pmap(.,predCrossVarsAD,CrossesToPredict=CrossesToPredict,predType=predType,
                            AddEffectList=AddEffectList,DomEffectList=DomEffectList,
                            haploMat=haploMat,recombFreqMat=recombFreqMat,
                            postMeanAddEffects=postMeanAddEffects,postMeanDomEffects=postMeanDomEffects,ncores=ncores))

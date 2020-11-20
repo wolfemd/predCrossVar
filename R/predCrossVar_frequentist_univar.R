@@ -191,7 +191,7 @@ predCrossVarAD<-function(sireID,damID,addEffects,domEffects,
 runCrossVarPredsA<-function(outprefix=NULL,outpath=NULL,
                             ped,addEffects,
                             haploMat,recombFreqMat,ncores=1,...){
-      require(furrr); options(mc.cores=ncores); plan(multiprocess)
+      require(furrr); options(mc.cores=ncores); plan(multisession)
       timestart<-proc.time()[3]
       predictedfamvars<-ped %>%
             dplyr::mutate(predVars=future_map2(sireID,damID,
@@ -234,7 +234,7 @@ runCrossVarPredsA<-function(outprefix=NULL,outpath=NULL,
 runCrossVarPredsAD<-function(outprefix=NULL,outpath=NULL,
                              ped,addEffects,domEffects,
                              haploMat,recombFreqMat,ncores=1,...){
-      require(furrr); options(mc.cores=ncores); plan(multiprocess)
+      require(furrr); options(mc.cores=ncores); plan(multisession)
       timestart<-proc.time()[3]
       predictedfamvars<-ped %>%
             dplyr::mutate(predVars=future_map2(sireID,damID,

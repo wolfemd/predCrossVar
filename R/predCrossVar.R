@@ -553,7 +553,7 @@ predCrossVarsA<-function(Trait1,Trait2,CrossesToPredict,predType,
       postVarCovarOfAlleleSubEffects<-NULL;
    }
 
-   require(furrr); options(mc.cores=ncores); plan(multiprocess)
+   require(furrr); options(mc.cores=ncores); plan(multisession)
    predictedfamvars<-CrossesToPredict %>%
       dplyr::mutate(predVars=future_pmap(.,
                                          predOneCrossVarA,
@@ -609,7 +609,7 @@ predCrossVarsAD<-function(Trait1,Trait2,CrossesToPredict,predType,
       postVarCovarOfDomEffects<-NULL;
    }
 
-   require(furrr); options(mc.cores=ncores); plan(multiprocess)
+   require(furrr); options(mc.cores=ncores); plan(multisession)
    predictedfamvars<-CrossesToPredict %>%
       dplyr::mutate(predVars=future_pmap(.,
                                          predOneCrossVarAD,

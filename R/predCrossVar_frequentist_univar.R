@@ -77,8 +77,8 @@ predCrossVarA<-function(sireID,damID,addEffects,
       starttime<-proc.time()[3]
       # check for and remove SNPs fixed in parents
       ### hopes to save time / mem
-      x<-colSums(rbind(haploMat[grep(paste0(sireID,"_"),rownames(haploMat)),],
-                       haploMat[grep(paste0(damID,"_"),rownames(haploMat)),]))
+      x<-colSums(rbind(haploMat[grep(paste0("^",sireID,"_"),rownames(haploMat)),],
+                       haploMat[grep(paste0("^",damID,"_"),rownames(haploMat)),]))
       segsnps2keep<-names(x[x>0 & x<4])
       if(length(segsnps2keep)>0){
             # drop=F safegaurds against matrix->vector conversion if only 1 seg. locus (column)
@@ -133,8 +133,8 @@ predCrossVarAD<-function(sireID,damID,addEffects,domEffects,
       starttime<-proc.time()[3]
       # check for and remove SNPs fixed in parents
       ### hopes to save time / mem
-      x<-colSums(rbind(haploMat[grep(paste0(sireID,"_"),rownames(haploMat)),],
-                       haploMat[grep(paste0(damID,"_"),rownames(haploMat)),]))
+      x<-colSums(rbind(haploMat[grep(paste0("^",sireID,"_"),rownames(haploMat)),],
+                       haploMat[grep(paste0("^",damID,"_"),rownames(haploMat)),]))
       segsnps2keep<-names(x[x>0 & x<4])
       if(length(segsnps2keep)>0){
             # drop=F safegaurds against matrix->vector conversion if only 1 seg. locus (column)

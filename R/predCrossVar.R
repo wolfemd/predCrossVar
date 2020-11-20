@@ -383,8 +383,8 @@ predOneCrossVarA<-function(Trait1,Trait2,sireID,damID,
    # check for and remove SNPs that
    # won't segregate, i.e. are fixed in parents
    ### hopes to save time / mem
-   x<-colSums(rbind(haploMat[grep(paste0(sireID,"_"),rownames(haploMat)),],
-                    haploMat[grep(paste0(damID,"_"),rownames(haploMat)),]))
+   x<-colSums(rbind(haploMat[grep(paste0("^",sireID,"_"),rownames(haploMat)),],
+                    haploMat[grep(paste0("^",damID,"_"),rownames(haploMat)),]))
    segsnps2keep<-names(x[x>0 & x<4])
 
    if(length(segsnps2keep)>0){
@@ -460,8 +460,8 @@ predOneCrossVarAD<-function(Trait1,Trait2,sireID,damID,
    # check for and remove SNPs that
    # won't segregate, i.e. are fixed in parents
    ### hopes to save time / mem
-   x<-colSums(rbind(haploMat[grep(paste0(sireID,"_"),rownames(haploMat)),],
-                    haploMat[grep(paste0(damID,"_"),rownames(haploMat)),]))
+   x<-colSums(rbind(haploMat[grep(paste0("^",sireID,"_"),rownames(haploMat)),],
+                    haploMat[grep(paste0("^",damID,"_"),rownames(haploMat)),]))
    segsnps2keep<-names(x[x>0 & x<4])
 
    if(length(segsnps2keep)>0){

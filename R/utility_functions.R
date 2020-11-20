@@ -266,7 +266,7 @@ genmap2recombfreq<-function(m,nChr){
 #'
 #' @examples
 calcGameticLD<-function(parentGID,recombFreqMat,haploMat){
-      X<-haploMat[grep(paste0(parentGID,"_"),rownames(haploMat)),,drop=F]
+      X<-haploMat[grep(paste0("^",parentGID,"_"),rownames(haploMat)),,drop=F]
       ### drop=F safegaurds against matrix->vector conversion if only 1 seg. locus (column)
       # Equiv versions (in case another is more efficient)
       # Version1

@@ -1,0 +1,49 @@
+template:
+  params:
+    bootswatch: flatly
+
+reference:
+- title: Prediction functions
+- subtitle: Predict cross variances
+  desc: Functions for predicting genetic variances
+  contents:
+  - matches("CrossVar")
+- subtitle: Predict cross means
+  desc: Functions for predicting genetic means
+  contents:
+  - matches("CrossMean")
+- title: The rest
+  desc: Utility / helper Functions
+  contents:
+  - -matches("CrossVar|CrossMean")
+
+navbar:
+  structure:
+    left:
+    - home
+    - intro
+    - reference
+    - articles
+    - tutorials
+    - news
+    right: github
+  components:
+    home:
+      icon: fas fa-home fa-lg
+      href: index.html
+    intro:
+      text: Get Started
+      href: articles/getting_started.html
+    reference:
+      text: Reference
+      href: reference/index.html
+    github:
+      icon: fab fa-github fa-lg
+      href: https://github.com/wolfemd/predCrossVar/
+    articles:
+      text: Articles
+      menu:
+      - text: Get Started
+        href: articles/getting_started.html
+
+bibliography: refs.bib

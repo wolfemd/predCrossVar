@@ -1,0 +1,277 @@
+---
+title: "Get Started"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Get Started}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+bibliography: 
+  - refs.bib
+link-citations: yes
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+```{r setup}
+library(predCrossVar)
+```
+
+# Intro
+
+The **predCrossVar** package contains a complete set of functions for the prediction of additive and dominance genetic variances and *co*-variances among full-siblings based on parents, following [@lehermeier2017; @lehermeier2017a]. **predCrossVar** enables the prediction of genetic variance on a multi-trait selection index. Built for diploid organisms with phased, chromosome- or linkage-group ordered biallelic marker data, and a centimorgan-scale genetic map.
+
+## Predicting genetic variance
+
+Summarize formula for predicting genetic variance in crosses. Thanks to those whose work I have learned from and built upon.
+
+-   Lehermeier
+
+-   Allier UCPC
+
+-   Neyhart
+
+-   Bijma et al.
+
+-   Lynch & Walsh 1998
+
+-   Also *in silico* as in **PopVar**
+
+-   Wolfe et al. Genomic mate selection MS
+
+# Notice: Package dev. status
+
+At this early development stage, package is unforgiving. There are not many arguments with defaults. Input formats are pretty specific, but well defined.
+
+# Core functions
+
+The package helps automate prediction for both simple (one trait, one cross) and complex (multi-trait, many crosses) scenarios.
+
++------------------------+------------------------------------------------------------+
+| Single-trait Functions | REML or $MCMC^{VPM}$                                       |
++========================+============================================================+
+| `predCrossVarA()`      | Predicts one cross variance                                |
++------------------------+------------------------------------------------------------+
+| `runCrossVarPredsA()`  | Wraps around `predCrossVarA()` to predict multiple crosses |
++------------------------+------------------------------------------------------------+
+
+Equivalent functions for an additive-plus-dominance models are: `predCrossVarAD()` --\> `runCrossVarPredsAD()` No function as of now to do dominance separately.
+
+Note that these functions were developed early, and the multi-trait functions potentially supersede these.
+
++-------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------+
+| Multi-trait Functions   | REML, $MCMC^{VPM}$, $MCMC^{PMV}$                                                                                                                    |
++=========================+=====================================================================================================================================================+
+| `predOneCrossVarA()`    | Predicts one cross, one variance (or covariance), additive-only model                                                                               |
++-------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------+
+| `predCrossVarsA()`      | wraps around `predOneCrossVarA()`. Predicts multiple crosses (potentially in parallel/multicore), one variance (or covariance), additive-only model |
++-------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------+
+| `runMtCrossVarPredsA()` | wraps around `predCrossVarsA()`. Predicts the variances *and* covariances in the multi-trait case for a set of crosses, additive-only model.        |
++-------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------+
+
+Equivalent functions for an additive-plus-dominance models are: `predOneCrossVarAD()` --\> `predCrossVarsAD()` --\> `runMtCrossVarPredsAD()`. No function as of now to do only dominance.
+
+There are also functions for the much less computationally challenging prediction of cross means (`predCrossMeanBVsOneTrait()` --\> `predCrossMeanBVs()`).
+
+The multi-trait, multi-family function, `runMtCrossVarPredsA()` should be suitable for the univariate, unifamily prediction *but* users might find the list-of-matrices input format requirement unnecessary.
+
+# Intro example
+
+First, let's just predict a single cross, single trait, additive-only model.
+
+## Inputs
+
+To predict cross variance, 3 types of input are required:
+
+1.  Phased Parental Haplotypes
+2.  Genetic Map (or pairwise-recombination frequencies)
+3.  Marker Effects
+
+We start with the included example simulation data. 100 individuals, 2 chromosomes with 10 QTL/chr.
+
+### Genetic map
+
+The usual starting place for recombination frequency is a centimorgan-scale genetic map.
+
+```{r}
+data(genmap)
+str(genmap)
+```
+
+```{r}
+# utility function to compute matrix of pairwise recombination frequencies. 
+recombFreqMat<-genmap2recombfreq(genmap,nChr = 2)
+```
+
+```{r}
+dim(recombFreqMat)
+```
+
+In practice, these matrices get big as they have dimension $N_{snp} \times N_{snp}$. It is recommended to precompute and store the `recombFreqMat`.
+
+In predicting genetic variance in the $F_1$ cross, the `recombFreqMat` the matrix $1-(2 \times recombFreqMat)$ is computed. To avoid having to do that separately for each family being predicted, I designed the prediction functions to require $1-(2 \times recombFreqMat)$ as input, to save a great deal of computation. *Therefore* pre-compute it and store *that* on disk. Probably this can be improved on!
+
+```{r}
+recombFreqMat<-1-(2*recombFreqMat)
+recombFreqMat[1:5,1:5]
+```
+
+### Phased parental haplotypes
+
+The example dataset **haplos** contains 2 chrom. with 10 loci each (columns) for 100 individuals (200 rows).
+
+```{r}
+data("haploMat")
+dim(haploMat)
+```
+
+```{r}
+haploMat[1:5,1:10]
+```
+
+### Marker effects
+
+The example data come in the form of an list of row-matrices, which is useful for multivariate analyses we will get into later. There is also an example **DomEffectsList** available to load later.
+
+```{r}
+data("AddEffectsList")
+str(AddEffectsList)
+```
+
+# Single-trait predictions
+
+The first set of functions we will use are simplest. They only handle single traits. No covariance predictions.
+
+## Predict one cross
+
+To start, predict a single cross between parents **"1"** and **"2"**
+
+```{r}
+# For the univariate case, input effects should be a column matrix.
+addEffectsT1<-t(AddEffectsList$Trait1)
+addEffectsT2<-t(AddEffectsList$Trait2)
+dim(addEffectsT1)
+```
+
+```{r}
+# Trait 1
+predCrossVarA(sireID = "1", damID = "2", 
+              addEffects = addEffectsT1,
+              haploMat = haploMat,
+              recombFreqMat = recombFreqMat)
+```
+
+```{r}
+# Trait 2
+predCrossVarA(sireID = "1", damID = "2", 
+              addEffects = addEffectsT2,
+              haploMat = haploMat,
+              recombFreqMat = recombFreqMat)
+```
+
+## Predict several crosses
+
+Multiple families can be predicted, with an option for parallel processing across families with the `runCrossVarPredsA()` (additive-only) and `runCrossVarPredsAD()` (additive-plus-dominance) functions.
+
+For example, we will pick three parents of interest.
+
+There is a helper function `crosses2predict()` to make a list of all pairwise matings given an input vecot of parent IDs. Includes self-crosses and the upper-triangle of a mating matrix (i.e. no reciprocal crosses).
+
+```{r}
+ped2predict<-crosses2predict(parents = c("1","2","11"))
+ped2predict
+```
+
+```{r}
+# Trait 1 - serial (ncores = 1)
+runCrossVarPredsA(ped = ped2predict,
+                  addEffects = addEffectsT1,
+                  haploMat = haploMat,
+                  recombFreqMat = recombFreqMat)
+```
+
+## Multi-core across families
+
+```{r}
+# Trait 1 - parallel (ncores = 2)
+runCrossVarPredsA(ped = ped2predict,
+                  addEffects = addEffectsT1,
+                  haploMat = haploMat,
+                  recombFreqMat = recombFreqMat,
+                  ncores = 6)
+```
+
+```{r}
+# Trait 2 - parallel (ncores = 2)
+runCrossVarPredsA(ped = ped2predict,
+                  addEffects = addEffectsT2,
+                  haploMat = haploMat,
+                  recombFreqMat = recombFreqMat,
+                  ncores = 6)
+```
+## Additive-plus-dominance
+
+```{r}
+data("DomEffectsList")
+domEffectsT1<-t(DomEffectsList$Trait1)
+domEffectsT2<-t(DomEffectsList$Trait2)
+```
+
+```{r}
+# Trait 1
+runCrossVarPredsAD(ped = ped2predict,
+                  addEffects = addEffectsT1,
+                  domEffects = domEffectsT1,
+                  haploMat = haploMat,
+                  recombFreqMat = recombFreqMat,
+                  ncores = 6)
+```
+
+```{r}
+# Trait 2
+runCrossVarPredsAD(ped = ped2predict,
+                  addEffects = addEffectsT1,
+                  domEffects = domEffectsT1,
+                  haploMat = haploMat,
+                  recombFreqMat = recombFreqMat,
+                  ncores = 6)
+```
+
+# Multiple-trait predictions
+
+(including covariances)
+
+`predOneCrossVarA()` -> `predCrossVarsA()` -> `runMtCrossVarPredsA()`
+
+`runMtCrossVarPredsA()` and `runMtCrossVarPredsAD()` should supersede in function all the others as it can also handle single trait, single cross predictions.
+
+**NOTES:** 
+
+- Arguments names are pretty opinionated and long, although not without good intention. Might be worth simplifying.
+    + e.g. `predOneCrossVarA()`: `postMeanAlleleSubEffects=` could just be `addEffectsLists=`
+
+
+# A note on marker effects input
+
+```{r}
+data("AddEffectsList")
+str(AddEffectsList)
+```
+
+-   List of allele substitution effects.
+
+-   Each list element is a matrix. One matrix per trait.
+
+-   Each element of the list is named with a string identifying the trait and the `colnames` of each matrix are labeled with snpIDs.
+
+-   Dimensions of each matrix of marker effects
+
+    -  $1 \times N_{snp}$: Many users will have marker effects estimated with REML or only want to use the posterior mean marker effects from a Bayesian marker-regression. For these users, the argument `predType=="VPM"` should be used *and* each matrix of the `AlleleSubEffectList` will have only one row.
+    -   $\frac{N_{iter} - N_{burnIn}}{N_{thin}} \times N_{snp}$: When predicting the Posterior Mean Variance (PMV), use argument `predType=="VPM"` when computing the predicted variance across a sample of marker effects, e.g. the thinned MCMC samples, usually stored on disk.
+
+
+# References

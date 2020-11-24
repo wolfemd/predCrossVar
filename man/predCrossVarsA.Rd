@@ -2,7 +2,7 @@
 % Please edit documentation in R/predCrossVar.R
 \name{predCrossVarsA}
 \alias{predCrossVarsA}
-\title{predCrossVarsA}
+\title{Multi-trait, multi-cross prediction of one additive genetic variance (or covariance) among full-siblings.}
 \usage{
 predCrossVarsA(
   Trait1,
@@ -24,26 +24,25 @@ predCrossVarsA(
 
 \item{CrossesToPredict}{data.frame or tibble, col/colnames: sireID, damID. sireID and damID must both be in the haploMat.}
 
-\item{predType}{string, "VPM" or "PMV". Default = "VPM" for variance of posterior means, this is faster but expected to be less accurate / more biased than the alternative predType=="PMV". PMV requires user to supply a variance-covariance matrix of effects estimates.}
+\item{predType}{string, "VPM" or "PMV". Choose option "VPM" if you have REML marker effect estimates (or posterior-means from MCMC) one set of marker effect estimates per trait. Variance of posterior means is faster but the alternative predType=="PMV" is expected to be less biassed. PMV requires user to supply a (probably LARGE) variance-covariance matrix of effects estimates.}
 
 \item{haploMat}{matrix of phased haplotypes, 2 rows per sample, cols = loci, {0,1}, rownames assumed to contain GIDs with a suffix, separated by "_" to distinguish haplotypes}
 
 \item{recombFreqMat}{a square symmetric matrix with values = (1-2*c1), where c1=matrix of expected recomb. frequencies. The choice to do 1-2c1 outside the function was made for computation efficiency; every operation on a big matrix takes time.}
 
-\item{postMeanAlleleSubEffects}{list of named vectors (or column matrices) with the posterior mean ALLELE SUBSTITUTION marker effects.}
+\item{postMeanAlleleSubEffects}{list of named vectors (or column matrices) with the allele substitution marker effects (can posterior-mean effects from MCMC _or_ from REML, if @param predType set to "VPM".}
 
-\item{AlleleSubEffectList}{list of ALLELE SUBSTITUTION EFFECT matrices, one matrix per trait, Each element of the list is named with a string identifying the trait and the colnames of each matrix are labelled with snpIDs.}
+\item{AlleleSubEffectList}{Only if @param predType set to "PMV". List of matrices list of ALLELE SUBSTITUTION EFFECT matrices, of dimension N SNP x N SNP. Mne matrix per trait, Each element of the list is named with a string identifying the trait and the colnames of each matrix are labelled with snpIDs.}
 
 \item{ncores}{If ncores set > 1 parallelizes across families, but beware it is memory intensive and options(future.globals.maxSize=___) may need to be adjusted.}
 
 \item{...}{}
 }
 \value{
-list with two elements, "predictedfamvars" contains a tibble with all predictions for all requested families, "totcomputetime" gives the time taken to compute one var. parameter across all familes, at the given ncores.
+list with two elements, "predictedfamvars" contains a tibble with all predictions for all requested families, "totcomputetime" gives the time taken to compute one var. parameter across all families, at the given ncores.
 }
 \description{
-Predict the additive variance or co-variance for a set of crosses, potentially in parallel across families.
-Wraps predOneCrossVarA across families.
+User specifies a trait variance (or trait-trait covariance) to predict. Wrapper around `predOneCrossVarA()` for predicting multiple families. Input a data.frame of crosses to predict.
 NOTE: Marker effects should represent allele substitution effects.
 Either by fitting an additive-only model OR an genotypic-partitioned additive+dominance model,
 with allele sub effects computed as a+d(q-p), where q and p are allele freqs in the training pop. used.

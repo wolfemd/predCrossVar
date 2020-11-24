@@ -2,7 +2,7 @@
 % Please edit documentation in R/predCrossVar_frequentist_univar.R
 \name{runCrossVarPredsA}
 \alias{runCrossVarPredsA}
-\title{runCrossVarPredsA}
+\title{Single-trait prediction of the additive genetic variance for multiple crosses}
 \usage{
 runCrossVarPredsA(
   outprefix = NULL,
@@ -32,6 +32,6 @@ runCrossVarPredsA(
 
 }
 \description{
-Function to compute predicted add + dom vars for an entire pedigree.
+Wraps around `predCrossVarA()` to predict multiple crosses. Option for parallelizing prediction across families.
 If outprefix and outpath are supplied, writes output to disk so impatient users can see results.
 }

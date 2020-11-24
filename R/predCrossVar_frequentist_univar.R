@@ -55,9 +55,9 @@ getM2varcomp<-function(effects,varcovarmat,type){
 }
 
 
-#' predCrossVarA function
+#' Single trait prediction of the additive genetic variance in a one cross
 #'
-#' Function to predict the additive and dominance variances in a full-sibling family based on marker effects from a Additive+Dominance genome-wide SNP-BLUP model.
+#' Function to predict the additive genetic variances among full-siblings of a single, user-specified cross.
 #'
 #' @param sireID string, Sire genotype ID. Needs to correspond to renames in haploMat
 #' @param damID string, Dam genotype ID. Needs to correspond to renames in haploMat
@@ -109,9 +109,9 @@ predCrossVarA<-function(sireID,damID,addEffects,
 }
 
 
-#' predCrossVarAD function
+#' Single trait prediction of the additive _and_ dominance genetic variance in a one cross
 #'
-#' Function to predict the additive and dominance variances in a full-sibling family based on marker effects from a Additive+Dominance genome-wide SNP-BLUP model.
+#' Function to predict the additive genetic _and_ dominance variances among full-siblings of a single, user-specified cross.
 #'
 #' @param sireID string, Sire genotype ID. Needs to correspond to renames in haploMat
 #' @param damID string, Dam genotype ID. Needs to correspond to renames in haploMat
@@ -170,9 +170,9 @@ predCrossVarAD<-function(sireID,damID,addEffects,domEffects,
 }
 
 
-#' runCrossVarPredsA
+#' Single-trait prediction of the additive genetic variance for multiple crosses
 #'
-#' Function to compute predicted add + dom vars for an entire pedigree.
+#' Wraps around `predCrossVarA()` to predict multiple crosses. Option for parallelizing prediction across families.
 #' If outprefix and outpath are supplied, writes output to disk so impatient users can see results.
 #'
 #' @param outprefix
@@ -206,15 +206,15 @@ runCrossVarPredsA<-function(outprefix=NULL,outpath=NULL,
                    " mins for ",nrow(predictedfamvars)," families"))
       if(!is.null(outprefix) & !is.null(outpath)){
             saveRDS(predictedfamvars,
-                    file=here::here(outpath,paste0(outprefix,"_predCrossVars_ModelAD.rds")))
+                    file=here::here(outpath,paste0(outprefix,"_predCrossVars_ModelA.rds")))
       }
       return(predictedfamvars)
 }
 
 
-#' runCrossVarPredsAD
+#' Single-trait prediction of the additive _and_ dominance genetic variance for multiple crosses
 #'
-#' Function to compute predicted add + dom vars for an entire pedigree.
+#' Wraps around `predCrossVarAD()` to predict multiple crosses. Option for parallelizing prediction across families.
 #' If outprefix and outpath are supplied, writes output to disk so impatient users can see results.
 #'
 #' @param outprefix

@@ -2,7 +2,7 @@
 % Please edit documentation in R/predCrossVar.R
 \name{predOneCrossVarA}
 \alias{predOneCrossVarA}
-\title{predOneCrossVarA}
+\title{Multi-trait prediction of one additive genetic variance (or covariance) among full-siblings.}
 \usage{
 predOneCrossVarA(
   Trait1,
@@ -30,11 +30,11 @@ predOneCrossVarA(
 
 \item{recombFreqMat}{a square symmetric matrix with values = (1-2*c1), where c1=matrix of expected recomb. frequencies. The choice to do 1-2c1 outside the function was made for computation efficiency; every operation on a big matrix takes time.}
 
-\item{predType}{string, "VPM" or "PMV". Default = "VPM" for variance of posterior means, this is faster but expected to be less accurate / more biased than the alternative predType=="PMV". PMV requires user to supply a variance-covariance matrix of effects estimates.}
+\item{predType}{string, "VPM" or "PMV". Choose option "VPM" if you have REML marker effect estimates (or posterior-means from MCMC) one set of marker effect estimates per trait. Variance of posterior means is faster but the alternative predType=="PMV" is expected to be less biassed. PMV requires user to supply a (probably LARGE) variance-covariance matrix of effects estimates.}
 
-\item{postMeanAlleleSubEffects}{list of named vectors (or column matrices) with the posterior mean ALLELE SUBSTITUTION marker effects.}
+\item{postMeanAlleleSubEffects}{list of named vectors (or column matrices) with the allele substitution marker effects (can posterior-mean effects from MCMC _or_ from REML, if @param predType set to "VPM".}
 
-\item{postVarCovarOfAlleleSubEffects}{matrix of dimension N SNP x N SNP. ALLELE SUBSTITUTION Posterior Sample Variance-Covariance Matrix of Marker Effects Estimates.}
+\item{postVarCovarOfAlleleSubEffects}{Only if @param predType set to "PMV". Matrix of dimension N SNP x N SNP. ALLELE SUBSTITUTION Posterior Sample Variance-Covariance Matrix of Marker Effects Estimates.}
 
 \item{...}{}
 }
@@ -42,5 +42,5 @@ predOneCrossVarA(
 tibble with predicted additive variance for one cross, one variance parameter
 }
 \description{
-Predict the additive variance or co-variance in one cross.
+User specifies a trait variance (or trait-trait covariance) to predict for a specific pair of parents. Predicts the addtiive genetic variance (or covariance) among full-siblings of that cross.
 }

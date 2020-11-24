@@ -354,9 +354,9 @@ predCrossMeanTGVs<-function(CrossesToPredict,postMeanAddEffects,postMeanDomEffec
       unnest(predMeanGVs)
    return(means) }
 
-#' predOneCrossVarA
+#' Multi-trait prediction of one additive genetic variance (or covariance) among full-siblings.
 #'
-#' Predict the additive variance or co-variance in one cross.
+#' User specifies a trait variance (or trait-trait covariance) to predict for a specific pair of parents. Predicts the addtiive genetic variance (or covariance) among full-siblings of that cross.
 #'
 #' @param Trait1 string, label for Trait1. When Trait1==Trait2 computes the genomic variance of the trait, when Trait1!=Trait2 computes the genomic covariance between traits.
 #' @param Trait2 string, label for Trait2. When Trait1==Trait2 computes the genomic variance of the trait, when Trait1!=Trait2 computes the genomic covariance between traits.
@@ -364,9 +364,9 @@ predCrossMeanTGVs<-function(CrossesToPredict,postMeanAddEffects,postMeanDomEffec
 #' @param damID string, Dam genotype ID. Needs to correspond to renames in haploMat
 #' @param haploMat matrix of phased haplotypes, 2 rows per sample, cols = loci, {0,1}, rownames assumed to contain GIDs with a suffix, separated by "_" to distinguish haplotypes
 #' @param recombFreqMat a square symmetric matrix with values = (1-2*c1), where c1=matrix of expected recomb. frequencies. The choice to do 1-2c1 outside the function was made for computation efficiency; every operation on a big matrix takes time.
-#' @param predType string, "VPM" or "PMV". Default = "VPM" for variance of posterior means, this is faster but expected to be less accurate / more biased than the alternative predType=="PMV". PMV requires user to supply a variance-covariance matrix of effects estimates.
-#' @param postMeanAlleleSubEffects list of named vectors (or column matrices) with the posterior mean ALLELE SUBSTITUTION marker effects.
-#' @param postVarCovarOfAlleleSubEffects matrix of dimension N SNP x N SNP. ALLELE SUBSTITUTION Posterior Sample Variance-Covariance Matrix of Marker Effects Estimates.
+#' @param predType string, "VPM" or "PMV". Choose option "VPM" if you have REML marker effect estimates (or posterior-means from MCMC) one set of marker effect estimates per trait. Variance of posterior means is faster but the alternative predType=="PMV" is expected to be less biassed. PMV requires user to supply a (probably LARGE) variance-covariance matrix of effects estimates.
+#' @param postMeanAlleleSubEffects list of named vectors (or column matrices) with the allele substitution marker effects (can posterior-mean effects from MCMC _or_ from REML, if @param predType set to "VPM".
+#' @param postVarCovarOfAlleleSubEffects Only if @param predType set to "PMV". Matrix of dimension N SNP x N SNP. ALLELE SUBSTITUTION Posterior Sample Variance-Covariance Matrix of Marker Effects Estimates.
 #' @param ...
 #'
 #' @return tibble with predicted additive variance for one cross, one variance parameter
@@ -429,9 +429,9 @@ predOneCrossVarA<-function(Trait1,Trait2,sireID,damID,
    return(out)
 }
 
-#' predOneCrossVarAD
+#' Multi-trait prediction of one additive _and_ one dominance genetic variance (or covariance) among full-siblings.
 #'
-#' Predict the additive and dominance variance or co-variance in one cross.
+#' User specifies a trait variance (or trait-trait covariance) to predict for a specific pair of parents. Predicts the additive genetic variance (or covariance) among full-siblings of that cross.
 #'
 #' @param Trait1 string, label for Trait1. When Trait1==Trait2 computes the genomic variance of the trait, when Trait1!=Trait2 computes the genomic covariance between traits.
 #' @param Trait2 string, label for Trait2. When Trait1==Trait2 computes the genomic variance of the trait, when Trait1!=Trait2 computes the genomic covariance between traits.
@@ -439,11 +439,11 @@ predOneCrossVarA<-function(Trait1,Trait2,sireID,damID,
 #' @param damID string, Dam genotype ID. Needs to correspond to renames in haploMat
 #' @param haploMat matrix of phased haplotypes, 2 rows per sample, cols = loci, {0,1}, rownames assumed to contain GIDs with a suffix, separated by "_" to distinguish haplotypes
 #' @param recombFreqMat a square symmetric matrix with values = (1-2*c1), where c1=matrix of expected recomb. frequencies. The choice to do 1-2c1 outside the function was made for computation efficiency; every operation on a big matrix takes time.
-#' @param predType string, "VPM" or "PMV". Default = "VPM" for variance of posterior means, this is faster but expected to be less accurate / more biased than the alternative predType=="PMV". PMV requires user to supply a variance-covariance matrix of effects estimates.
-#' @param postMeanAddEffects list of named vectors (or column matrices) with the posterior mean ADDITIVE marker effects.
-#' @param postMeanDomEffects list of named vectors (or column matrices) with the posterior mean DOMINANCE marker effects.
-#' @param postVarCovarOfAddEffects matrix of dimension N SNP x N SNP. ADDITIVE Posterior Sample Variance-Covariance Matrix of Marker Effects Estimates.
-#' @param postVarCovarOfDomEffects matrix of dimension N SNP x N SNP. DOMINANCE Posterior Sample Variance-Covariance Matrix of Marker Effects Estimates.
+#' @param predType string, "VPM" or "PMV". Choose option "VPM" if you have REML marker effect estimates (or posterior-means from MCMC) one set of marker effect estimates per trait. Variance of posterior means is faster but the alternative predType=="PMV" is expected to be less biassed. PMV requires user to supply a (probably LARGE) variance-covariance matrix of effects estimates.
+#' @param postMeanAddEffects list of named vectors (or column matrices) with the additive marker effects (can posterior-mean effects from MCMC _or_ from REML, if @param predType set to "VPM".
+#' @param postMeanDomEffects list of named vectors (or column matrices) with the dominance marker effects (can posterior-mean effects from MCMC _or_ from REML, if @param predType set to "VPM".
+#' @param postVarCovarOfAddEffects Only if @param predType set to "PMV". Matrix of dimension N SNP x N SNP. ADDITIVE Posterior Sample Variance-Covariance Matrix of Marker Effects Estimates.
+#' @param postVarCovarOfDomEffects Only if @param predType set to "PMV". Matrix of dimension N SNP x N SNP. DOMINANCE Posterior Sample Variance-Covariance Matrix of Marker Effects Estimates.
 #' @param ...
 #'
 #' @return tibble with predicted additive and dominance variance for one cross, one variance parameter
@@ -514,27 +514,26 @@ predOneCrossVarAD<-function(Trait1,Trait2,sireID,damID,
    return(out)
 }
 
-#' predCrossVarsA
+#' Multi-trait, multi-cross prediction of one additive genetic variance (or covariance) among full-siblings.
 #'
-#' Predict the additive variance or co-variance for a set of crosses, potentially in parallel across families.
-#' Wraps predOneCrossVarA across families.
+#' User specifies a trait variance (or trait-trait covariance) to predict. Wrapper around `predOneCrossVarA()` for predicting multiple families. Input a data.frame of crosses to predict.
 #' NOTE: Marker effects should represent allele substitution effects.
 #' Either by fitting an additive-only model OR an genotypic-partitioned additive+dominance model,
 #' with allele sub effects computed as a+d(q-p), where q and p are allele freqs in the training pop. used.
-
+#'
 #'
 #' @param Trait1 string, label for Trait1. When Trait1==Trait2 computes the genomic variance of the trait, when Trait1!=Trait2 computes the genomic covariance between traits.
 #' @param Trait2 string, label for Trait2. When Trait1==Trait2 computes the genomic variance of the trait, when Trait1!=Trait2 computes the genomic covariance between traits.
 #' @param CrossesToPredict data.frame or tibble, col/colnames: sireID, damID. sireID and damID must both be in the haploMat.
-#' @param predType string, "VPM" or "PMV". Default = "VPM" for variance of posterior means, this is faster but expected to be less accurate / more biased than the alternative predType=="PMV". PMV requires user to supply a variance-covariance matrix of effects estimates.
 #' @param haploMat matrix of phased haplotypes, 2 rows per sample, cols = loci, {0,1}, rownames assumed to contain GIDs with a suffix, separated by "_" to distinguish haplotypes
 #' @param recombFreqMat a square symmetric matrix with values = (1-2*c1), where c1=matrix of expected recomb. frequencies. The choice to do 1-2c1 outside the function was made for computation efficiency; every operation on a big matrix takes time.
-#' @param postMeanAlleleSubEffects list of named vectors (or column matrices) with the posterior mean ALLELE SUBSTITUTION marker effects.
-#' @param AlleleSubEffectList list of ALLELE SUBSTITUTION EFFECT matrices, one matrix per trait, Each element of the list is named with a string identifying the trait and the colnames of each matrix are labelled with snpIDs.
+#' @param predType string, "VPM" or "PMV". Choose option "VPM" if you have REML marker effect estimates (or posterior-means from MCMC) one set of marker effect estimates per trait. Variance of posterior means is faster but the alternative predType=="PMV" is expected to be less biassed. PMV requires user to supply a (probably LARGE) variance-covariance matrix of effects estimates.
+#' @param postMeanAlleleSubEffects list of named vectors (or column matrices) with the allele substitution marker effects (can posterior-mean effects from MCMC _or_ from REML, if @param predType set to "VPM".
+#' @param AlleleSubEffectList Only if @param predType set to "PMV". List of matrices list of ALLELE SUBSTITUTION EFFECT matrices, of dimension N SNP x N SNP. Mne matrix per trait, Each element of the list is named with a string identifying the trait and the colnames of each matrix are labelled with snpIDs.
 #' @param ncores If ncores set > 1 parallelizes across families, but beware it is memory intensive and options(future.globals.maxSize=___) may need to be adjusted.
 #' @param ...
 #'
-#' @return list with two elements, "predictedfamvars" contains a tibble with all predictions for all requested families, "totcomputetime" gives the time taken to compute one var. parameter across all familes, at the given ncores.
+#' @return list with two elements, "predictedfamvars" contains a tibble with all predictions for all requested families, "totcomputetime" gives the time taken to compute one var. parameter across all families, at the given ncores.
 #' @export
 #'
 #' @examples
@@ -570,25 +569,28 @@ predCrossVarsA<-function(Trait1,Trait2,CrossesToPredict,predType,
    return(predictedfamvars)
 }
 
-#' predCrossVarsAD
+#' Multi-trait, multi-cross prediction of one additive _and_ one dominance genetic variance (or covariance) among full-siblings.
 #'
-#' Predict the additive and dominance variance or co-variance for a set of crosses, potentially in parallel across families.
-#' Wraps predOneCrossVarAD across families
+#' User specifies a trait variance (or trait-trait covariance) to predict. Wrapper around `predOneCrossVarA()` for predicting multiple families. Input a data.frame of crosses to predict.
+#' NOTE: Marker effects should represent allele substitution effects.
+#' Either by fitting an additive-only model OR an genotypic-partitioned additive+dominance model,
+#' with allele sub effects computed as a+d(q-p), where q and p are allele freqs in the training pop. used.
+#'
 #'
 #' @param Trait1 string, label for Trait1. When Trait1==Trait2 computes the genomic variance of the trait, when Trait1!=Trait2 computes the genomic covariance between traits.
 #' @param Trait2 string, label for Trait2. When Trait1==Trait2 computes the genomic variance of the trait, when Trait1!=Trait2 computes the genomic covariance between traits.
 #' @param CrossesToPredict data.frame or tibble, col/colnames: sireID, damID. sireID and damID must both be in the haploMat.
-#' @param predType string, "VPM" or "PMV". Default = "VPM" for variance of posterior means, this is faster but expected to be less accurate / more biased than the alternative predType=="PMV". PMV requires user to supply a variance-covariance matrix of effects estimates.
 #' @param haploMat matrix of phased haplotypes, 2 rows per sample, cols = loci, {0,1}, rownames assumed to contain GIDs with a suffix, separated by "_" to distinguish haplotypes
 #' @param recombFreqMat a square symmetric matrix with values = (1-2*c1), where c1=matrix of expected recomb. frequencies. The choice to do 1-2c1 outside the function was made for computation efficiency; every operation on a big matrix takes time.
-#' @param postMeanAddEffects list of named vectors (or column matrices) with the posterior mean ADDITIVE marker effects.
-#' @param postMeanDomEffects list of named vectors (or column matrices) with the posterior mean DOMINANCE marker effects.
-#' @param AddEffectList list of ADDITIVE effect matrices, one matrix per trait, Each element of the list is named with a string identifying the trait and the colnames of each matrix are labelled with snpIDs.
-#' @param DomEffectList list of DOMINANCE effect matrices, one matrix per trait, Each element of the list is named with a string identifying the trait and the colnames of each matrix are labelled with snpIDs.
+#' @param predType string, "VPM" or "PMV". Choose option "VPM" if you have REML marker effect estimates (or posterior-means from MCMC) one set of marker effect estimates per trait. Variance of posterior means is faster but the alternative predType=="PMV" is expected to be less biassed. PMV requires user to supply a (probably LARGE) variance-covariance matrix of effects estimates.
+#' @param postMeanAddEffects list of named vectors (or column matrices) with the additive marker effects (can posterior-mean effects from MCMC _or_ from REML, if @param predType set to "VPM".
+#' @param postMeanDomEffects list of named vectors (or column matrices) with the dominance marker effects (can posterior-mean effects from MCMC _or_ from REML, if @param predType set to "VPM".
+#' @param AddEffectList Only if @param predType set to "PMV". List of ADDITIVE effect matrices, of dimension N iter x N SNP. Mne matrix per trait, Each element of the list is named with a string identifying the trait and the colnames of each matrix are labelled with snpIDs.
+#' @param DomEffectList Only if @param predType set to "PMV". List of DOMINANCE effect matrices, of dimension N iter x N SNP. Mne matrix per trait, Each element of the list is named with a string identifying the trait and the colnames of each matrix are labelled with snpIDs.
 #' @param ncores If ncores set > 1 parallelizes across families, but beware it is memory intensive and options(future.globals.maxSize=___) may need to be adjusted.
 #' @param ...
 #'
-#' @return list with two elements, "predictedfamvars" contains a tibble with all predictions for all requested families, "totcomputetime" gives the time taken to compute one var. parameter across all familes, at the given ncores.
+#' @return list with two elements, "predictedfamvars" contains a tibble with all predictions for all requested families, "totcomputetime" gives the time taken to compute one var. parameter across all families, at the given ncores.
 #' @export
 #'
 #' @examples

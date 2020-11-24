@@ -2,7 +2,7 @@
 % Please edit documentation in R/predCrossVar_frequentist_univar.R
 \name{predCrossVarA}
 \alias{predCrossVarA}
-\title{predCrossVarA function}
+\title{Single trait prediction of the additive genetic variance in a one cross}
 \usage{
 predCrossVarA(sireID, damID, addEffects, haploMat, recombFreqMat, ...)
 }
@@ -23,7 +23,7 @@ predCrossVarA(sireID, damID, addEffects, haploMat, recombFreqMat, ...)
 a tibble with values for predicted add/dom variances as well as compute time and memory usage stats
 }
 \description{
-Function to predict the additive and dominance variances in a full-sibling family based on marker effects from a Additive+Dominance genome-wide SNP-BLUP model.
+Function to predict the additive genetic variances among full-siblings of a single, user-specified cross.
 }
 \details{
 SNP_IDs must match: names(addEffects)==names(domEffects)==colnames(haploMat)==rownames(recombFreqMat)==colnames(recombFreqMat).

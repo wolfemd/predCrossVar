@@ -2,7 +2,7 @@
 % Please edit documentation in R/predCrossVar.R
 \name{predOneCrossVarAD}
 \alias{predOneCrossVarAD}
-\title{predOneCrossVarAD}
+\title{Multi-trait prediction of one additive _and_ one dominance genetic variance (or covariance) among full-siblings.}
 \usage{
 predOneCrossVarAD(
   Trait1,
@@ -32,15 +32,15 @@ predOneCrossVarAD(
 
 \item{recombFreqMat}{a square symmetric matrix with values = (1-2*c1), where c1=matrix of expected recomb. frequencies. The choice to do 1-2c1 outside the function was made for computation efficiency; every operation on a big matrix takes time.}
 
-\item{predType}{string, "VPM" or "PMV". Default = "VPM" for variance of posterior means, this is faster but expected to be less accurate / more biased than the alternative predType=="PMV". PMV requires user to supply a variance-covariance matrix of effects estimates.}
+\item{predType}{string, "VPM" or "PMV". Choose option "VPM" if you have REML marker effect estimates (or posterior-means from MCMC) one set of marker effect estimates per trait. Variance of posterior means is faster but the alternative predType=="PMV" is expected to be less biassed. PMV requires user to supply a (probably LARGE) variance-covariance matrix of effects estimates.}
 
-\item{postMeanAddEffects}{list of named vectors (or column matrices) with the posterior mean ADDITIVE marker effects.}
+\item{postMeanAddEffects}{list of named vectors (or column matrices) with the additive marker effects (can posterior-mean effects from MCMC _or_ from REML, if @param predType set to "VPM".}
 
-\item{postMeanDomEffects}{list of named vectors (or column matrices) with the posterior mean DOMINANCE marker effects.}
+\item{postMeanDomEffects}{list of named vectors (or column matrices) with the dominance marker effects (can posterior-mean effects from MCMC _or_ from REML, if @param predType set to "VPM".}
 
-\item{postVarCovarOfAddEffects}{matrix of dimension N SNP x N SNP. ADDITIVE Posterior Sample Variance-Covariance Matrix of Marker Effects Estimates.}
+\item{postVarCovarOfAddEffects}{Only if @param predType set to "PMV". Matrix of dimension N SNP x N SNP. ADDITIVE Posterior Sample Variance-Covariance Matrix of Marker Effects Estimates.}
 
-\item{postVarCovarOfDomEffects}{matrix of dimension N SNP x N SNP. DOMINANCE Posterior Sample Variance-Covariance Matrix of Marker Effects Estimates.}
+\item{postVarCovarOfDomEffects}{Only if @param predType set to "PMV". Matrix of dimension N SNP x N SNP. DOMINANCE Posterior Sample Variance-Covariance Matrix of Marker Effects Estimates.}
 
 \item{...}{}
 }
@@ -48,5 +48,5 @@ predOneCrossVarAD(
 tibble with predicted additive and dominance variance for one cross, one variance parameter
 }
 \description{
-Predict the additive and dominance variance or co-variance in one cross.
+User specifies a trait variance (or trait-trait covariance) to predict for a specific pair of parents. Predicts the additive genetic variance (or covariance) among full-siblings of that cross.
 }

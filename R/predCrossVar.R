@@ -661,11 +661,14 @@ runMtCrossVarPredsA<-function(outprefix=NULL,outpath=NULL,predType="VPM",
    postMeanAlleleSubEffects<-purrr::map(AlleleSubEffectList,~attr(.,which = "scaled:center"))
 
    ## Predict trait (co)variances
-   varcovars<-dplyr::bind_rows(tibble::tibble(Trait1=traits,Trait2=traits), # trait variances
-                               combn(traits,2,simplify = T) %>% # covariances
-                                  t(.) %>% #
-                                  `colnames<-`(.,c("Trait1","Trait2")) %>%
-                                  tibble::as_tibble(.))
+   if(length(traits)>1){
+      varcovars<-dplyr::bind_rows(tibble::tibble(Trait1=traits,Trait2=traits), # trait variances
+                                  combn(traits,2,simplify = T) %>% # covariances
+                                     t(.) %>% #
+                                     `colnames<-`(.,c("Trait1","Trait2")) %>%
+                                     tibble::as_tibble(.)) } else {
+                                        varcovars<-tibble::tibble(Trait1=traits,Trait2=traits)
+                                     }
 
    haploMat<-haploMat[sort(c(paste0(parents,"_HapA"),paste0(parents,"_HapB"))),]
 
@@ -729,11 +732,14 @@ runMtCrossVarPredsAD<-function(outprefix=NULL,outpath=NULL,predType="VPM",
    postMeanDomEffects<-purrr::map(DomEffectList,~attr(.,which = "scaled:center"))
 
    ## Predict trait (co)variances
-   varcovars<-dplyr::bind_rows(tibble::tibble(Trait1=traits,Trait2=traits), # trait variances
-                               combn(traits,2,simplify = T) %>% # covariances
-                                  t(.) %>% #
-                                  `colnames<-`(.,c("Trait1","Trait2")) %>%
-                                  tibble::as_tibble(.))
+   if(length(traits)>1){
+      varcovars<-dplyr::bind_rows(tibble::tibble(Trait1=traits,Trait2=traits), # trait variances
+                                  combn(traits,2,simplify = T) %>% # covariances
+                                     t(.) %>% #
+                                     `colnames<-`(.,c("Trait1","Trait2")) %>%
+                                     tibble::as_tibble(.)) } else {
+                                        varcovars<-tibble::tibble(Trait1=traits,Trait2=traits)
+                                     }
 
    haploMat<-haploMat[sort(c(paste0(parents,"_HapA"),paste0(parents,"_HapB"))),]
 

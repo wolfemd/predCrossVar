@@ -32,9 +32,9 @@ predOneCrossVarA(
 
 \item{predType}{string, "VPM" or "PMV". Choose option "VPM" if you have REML marker effect estimates (or posterior-means from MCMC) one set of marker effect estimates per trait. Variance of posterior means is faster but the alternative predType=="PMV" is expected to be less biassed. PMV requires user to supply a (probably LARGE) variance-covariance matrix of effects estimates.}
 
-\item{postMeanAlleleSubEffects}{list of named vectors (or column matrices) with the allele substitution marker effects (can posterior-mean effects from MCMC _or_ from REML, if @param predType set to "VPM".}
+\item{postMeanAlleleSubEffects}{list of named vectors (or column matrices) with the allele substitution marker effects (can posterior-mean effects from MCMC _or_ from REML, if if setting predType="PMV".}
 
-\item{postVarCovarOfAlleleSubEffects}{Only if @param predType set to "PMV". Matrix of dimension N SNP x N SNP. ALLELE SUBSTITUTION Posterior Sample Variance-Covariance Matrix of Marker Effects Estimates.}
+\item{postVarCovarOfAlleleSubEffects}{Only if setting predType="PMV". Matrix of dimension N SNP x N SNP. ALLELE SUBSTITUTION Posterior Sample Variance-Covariance Matrix of Marker Effects Estimates.}
 
 \item{...}{}
 }

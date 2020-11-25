@@ -30,9 +30,9 @@ predCrossVarsA(
 
 \item{recombFreqMat}{a square symmetric matrix with values = (1-2*c1), where c1=matrix of expected recomb. frequencies. The choice to do 1-2c1 outside the function was made for computation efficiency; every operation on a big matrix takes time.}
 
-\item{postMeanAlleleSubEffects}{list of named vectors (or column matrices) with the allele substitution marker effects (can posterior-mean effects from MCMC _or_ from REML, if @param predType set to "VPM".}
+\item{postMeanAlleleSubEffects}{list of named vectors (or column matrices) with the allele substitution marker effects (can posterior-mean effects from MCMC _or_ from REML, if setting predType="PMV".}
 
-\item{AlleleSubEffectList}{Only if @param predType set to "PMV". List of matrices list of ALLELE SUBSTITUTION EFFECT matrices, of dimension N SNP x N SNP. Mne matrix per trait, Each element of the list is named with a string identifying the trait and the colnames of each matrix are labelled with snpIDs.}
+\item{AlleleSubEffectList}{Only if setting predType="PMV". List of of ALLELE SUBSTITUTION EFFECT matrices. One matrix per trait. Each element of the list is named with a string identifying the trait and the colnames of each matrix are labelled with snpIDs. If users effects are from REML or posterior-means MCMC, matrices will be of dimension 1 x N SNP. If users chose predType="PMV", each matrix will be dimension N thinned-MCMC sample x N SNP.}
 
 \item{ncores}{If ncores set > 1 parallelizes across families, but beware it is memory intensive and options(future.globals.maxSize=___) may need to be adjusted.}
 

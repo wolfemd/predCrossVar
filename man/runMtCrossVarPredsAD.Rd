@@ -2,18 +2,18 @@
 % Please edit documentation in R/predCrossVar.R
 \name{runMtCrossVarPredsAD}
 \alias{runMtCrossVarPredsAD}
-\title{runMtCrossVarPredsAD}
+\title{Multi-trait, multi-cross prediction of additive _and_ dominance genetic variances _and_ covariances among full-siblings.}
 \usage{
 runMtCrossVarPredsAD(
   outprefix = NULL,
   outpath = NULL,
-  predType,
+  predType = "VPM",
   CrossesToPredict,
   AddEffectList,
   DomEffectList,
   haploMat,
   recombFreqMat,
-  ncores,
+  ncores = 1,
   ...
 )
 }
@@ -22,13 +22,13 @@ runMtCrossVarPredsAD(
 
 \item{outpath}{string, path to disk location where files should be written. Can be left DEFAULT = NULL (no disk write)}
 
-\item{predType}{string, "VPM" or "PMV". Default = "VPM" for variance of posterior means, this is faster but expected to be less accurate / more biased than the alternative predType=="PMV". PMV requires user to supply a variance-covariance matrix of effects estimates.}
+\item{predType}{Default = "VPM". string, "VPM" or "PMV" Choose option "VPM" if you have REML marker effect estimates (or posterior-means from MCMC) one set of marker effect estimates per trait. Variance of posterior means is faster but the alternative predType=="PMV" is expected to be less biassed. PMV requires user to supply a (probably LARGE) variance-covariance matrix of effects estimates.}
 
 \item{CrossesToPredict}{data.frame or tibble, col/colnames: sireID, damID. sireID and damID must both be in the haploMat.}
 
-\item{AddEffectList}{list of ADDITIVE effect matrices, one matrix per trait, Each element of the list is named with a string identifying the trait and the colnames of each matrix are labelled with snpIDs.}
+\item{AddEffectList}{List of ADDITIVE effect matrices. One matrix per trait. Each element of the list is named with a string identifying the trait and the colnames of each matrix are labelled with snpIDs. If users effects are from REML or posterior-means MCMC, matrices will be of dimension 1 x N SNP. If users chose predType="PMV", each matrix will be dimension N thinned-MCMC sample x N SNP.}
 
-\item{DomEffectList}{list of DOMINANCE effect matrices, one matrix per trait, Each element of the list is named with a string identifying the trait and the colnames of each matrix are labelled with snpIDs.}
+\item{DomEffectList}{List of DOMINANCE effect matrices. One matrix per trait. Each element of the list is named with a string identifying the trait and the colnames of each matrix are labelled with snpIDs. If users effects are from REML or posterior-means MCMC, matrices will be of dimension 1 x N SNP. If users chose predType="PMV", each matrix will be dimension N thinned-MCMC sample x N SNP.}
 
 \item{haploMat}{matrix of phased haplotypes, 2 rows per sample, cols = loci, {0,1}, rownames assumed to contain GIDs with a suffix, separated by "_" to distinguish haplotypes}
 
@@ -42,8 +42,8 @@ runMtCrossVarPredsAD(
 
 }
 \description{
-Predict the additive and dominance variances _and_ covariances for a set of crosses, potentially in parallel across families.
-Wraps predCrossVarsAD across variance parameters.
-The output predicted variances should be suitable to
-compute predVar(TGV) = predVar(A) + predVar(D).
+User specifies a trait variance (or trait-trait covariance) to predict.
+Wrapper around `predCrossVarsAD()` for predicting all trait variances and trait-trait covariances across multiple families for both additive _and_ dominance components.
+Input a data.frame of crosses to predict.
+NOTE: Marker effects should represent allele substitution effects.
 }

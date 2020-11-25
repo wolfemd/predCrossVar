@@ -32,13 +32,13 @@ predCrossVarsAD(
 
 \item{recombFreqMat}{a square symmetric matrix with values = (1-2*c1), where c1=matrix of expected recomb. frequencies. The choice to do 1-2c1 outside the function was made for computation efficiency; every operation on a big matrix takes time.}
 
-\item{postMeanAddEffects}{list of named vectors (or column matrices) with the additive marker effects (can posterior-mean effects from MCMC _or_ from REML, if @param predType set to "VPM".}
+\item{postMeanAddEffects}{list of named vectors (or column matrices) with the additive marker effects (can posterior-mean effects from MCMC _or_ from REML, if setting predType="VPM".}
 
-\item{postMeanDomEffects}{list of named vectors (or column matrices) with the dominance marker effects (can posterior-mean effects from MCMC _or_ from REML, if @param predType set to "VPM".}
+\item{postMeanDomEffects}{list of named vectors (or column matrices) with the dominance marker effects (can posterior-mean effects from MCMC _or_ from REML, if setting predType="VPM".}
 
-\item{AddEffectList}{Only if @param predType set to "PMV". List of ADDITIVE effect matrices, of dimension N iter x N SNP. Mne matrix per trait, Each element of the list is named with a string identifying the trait and the colnames of each matrix are labelled with snpIDs.}
+\item{AddEffectList}{Only if setting predType="PMV". List of ADDITIVE effect matrices. One matrix per trait. Each element of the list is named with a string identifying the trait and the colnames of each matrix are labelled with snpIDs. If users effects are from REML or posterior-means MCMC, matrices will be of dimension 1 x N SNP. If users chose predType="PMV", each matrix will be dimension N thinned-MCMC sample x N SNP.}
 
-\item{DomEffectList}{Only if @param predType set to "PMV". List of DOMINANCE effect matrices, of dimension N iter x N SNP. Mne matrix per trait, Each element of the list is named with a string identifying the trait and the colnames of each matrix are labelled with snpIDs.}
+\item{DomEffectList}{Only if setting predType="PMV". List of DOMINANCE effect matrices. One matrix per trait. Each element of the list is named with a string identifying the trait and the colnames of each matrix are labelled with snpIDs. If users effects are from REML or posterior-means MCMC, matrices will be of dimension 1 x N SNP. If users chose predType="PMV", each matrix will be dimension N thinned-MCMC sample x N SNP.}
 
 \item{ncores}{If ncores set > 1 parallelizes across families, but beware it is memory intensive and options(future.globals.maxSize=___) may need to be adjusted.}
 
@@ -48,8 +48,5 @@ predCrossVarsAD(
 list with two elements, "predictedfamvars" contains a tibble with all predictions for all requested families, "totcomputetime" gives the time taken to compute one var. parameter across all families, at the given ncores.
 }
 \description{
-User specifies a trait variance (or trait-trait covariance) to predict. Wrapper around `predOneCrossVarA()` for predicting multiple families. Input a data.frame of crosses to predict.
-NOTE: Marker effects should represent allele substitution effects.
-Either by fitting an additive-only model OR an genotypic-partitioned additive+dominance model,
-with allele sub effects computed as a+d(q-p), where q and p are allele freqs in the training pop. used.
+User specifies a trait variance (or trait-trait covariance) to predict. Wrapper around `predOneCrossVarAD()` for predicting multiple families. Input a data.frame of crosses to predict.
 }

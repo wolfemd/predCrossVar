@@ -8,6 +8,7 @@ vignette: >
 bibliography: 
   - refs.bib
 link-citations: yes
+toc_depth: 3
 ---
 
 ```{r, include = FALSE}
@@ -47,41 +48,11 @@ Summarize formula for predicting genetic variance in crosses. Thanks to those wh
 
 At this early development stage, package is unforgiving. There are not many arguments with defaults. Input formats are pretty specific, but well defined.
 
-# Core functions
+Especially in the case of many markers and using parallel processing, memory consumption can be potentially very large and needs to be considered. Hopefully there is sig. room for improvement in this area. 
 
-The package helps automate prediction for both simple (one trait, one cross) and complex (multi-trait, many crosses) scenarios.
+# Example data
 
-+------------------------+------------------------------------------------------------+
-| Single-trait Functions | REML or $MCMC^{VPM}$                                       |
-+========================+============================================================+
-| `predCrossVarA()`      | Predicts one cross variance                                |
-+------------------------+------------------------------------------------------------+
-| `runCrossVarPredsA()`  | Wraps around `predCrossVarA()` to predict multiple crosses |
-+------------------------+------------------------------------------------------------+
-
-Equivalent functions for an additive-plus-dominance models are: `predCrossVarAD()` --\> `runCrossVarPredsAD()` No function as of now to do dominance separately.
-
-Note that these functions were developed early, and the multi-trait functions potentially supersede these.
-
-+-------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------+
-| Multi-trait Functions   | REML, $MCMC^{VPM}$, $MCMC^{PMV}$                                                                                                                    |
-+=========================+=====================================================================================================================================================+
-| `predOneCrossVarA()`    | Predicts one cross, one variance (or covariance), additive-only model                                                                               |
-+-------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------+
-| `predCrossVarsA()`      | wraps around `predOneCrossVarA()`. Predicts multiple crosses (potentially in parallel/multicore), one variance (or covariance), additive-only model |
-+-------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------+
-| `runMtCrossVarPredsA()` | wraps around `predCrossVarsA()`. Predicts the variances *and* covariances in the multi-trait case for a set of crosses, additive-only model.        |
-+-------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------+
-
-Equivalent functions for an additive-plus-dominance models are: `predOneCrossVarAD()` --\> `predCrossVarsAD()` --\> `runMtCrossVarPredsAD()`. No function as of now to do only dominance.
-
-There are also functions for the much less computationally challenging prediction of cross means (`predCrossMeanBVsOneTrait()` --\> `predCrossMeanBVs()`).
-
-The multi-trait, multi-family function, `runMtCrossVarPredsA()` should be suitable for the univariate, unifamily prediction *but* users might find the list-of-matrices input format requirement unnecessary.
-
-# Intro example
-
-First, let's just predict a single cross, single trait, additive-only model.
+I simulated 100 diploid individuals with 2 chromosomes, 10 QTL each, using the [**AlphaSimR** library](https://cran.r-project.org/web/packages/AlphaSimR/index.html). Two correlated traits with additive and dominance effects. Main use is to exemplify the input formats and usage of **predCrossVar** functions.
 
 ## Inputs
 
@@ -187,7 +158,7 @@ ped2predict
 ```
 
 ```{r}
-# Trait 1 - serial (ncores = 1)
+# Trait 1 - serial (DEFAULT, ncores = 1)
 runCrossVarPredsA(ped = ped2predict,
                   addEffects = addEffectsT1,
                   haploMat = haploMat,
@@ -197,7 +168,7 @@ runCrossVarPredsA(ped = ped2predict,
 ## Multi-core across families
 
 ```{r}
-# Trait 1 - parallel (ncores = 2)
+# Trait 1 - parallel (ncores = 6)
 runCrossVarPredsA(ped = ped2predict,
                   addEffects = addEffectsT1,
                   haploMat = haploMat,
@@ -206,13 +177,14 @@ runCrossVarPredsA(ped = ped2predict,
 ```
 
 ```{r}
-# Trait 2 - parallel (ncores = 2)
+# Trait 2 - parallel (ncores = 6)
 runCrossVarPredsA(ped = ped2predict,
                   addEffects = addEffectsT2,
                   haploMat = haploMat,
                   recombFreqMat = recombFreqMat,
                   ncores = 6)
 ```
+
 ## Additive-plus-dominance
 
 ```{r}
@@ -245,14 +217,458 @@ runCrossVarPredsAD(ped = ped2predict,
 
 (including covariances)
 
-`predOneCrossVarA()` -> `predCrossVarsA()` -> `runMtCrossVarPredsA()`
+`predOneCrossVarA()` -\> `predCrossVarsA()` -\> `runMtCrossVarPredsA()`
 
-`runMtCrossVarPredsA()` and `runMtCrossVarPredsAD()` should supersede in function all the others as it can also handle single trait, single cross predictions.
+`runMtCrossVarPredsA()` and `runMtCrossVarPredsAD()` should supersede in function all the others.
 
-**NOTES:** 
+**NOTES:**
 
-- Arguments names are pretty opinionated and long, although not without good intention. Might be worth simplifying.
-    + e.g. `predOneCrossVarA()`: `postMeanAlleleSubEffects=` could just be `addEffectsLists=`
+-   Arguments names are pretty opinionated and long, although not without good intention. Might be worth simplifying.
+
+    -   e.g. `predOneCrossVarA()`: `postMeanAlleleSubEffects=` could just be `addEffectsLists=`
+
+```{r}
+mtpred<-runMtCrossVarPredsAD(CrossesToPredict = ped2predict,
+                             AddEffectList = AddEffectsList,
+                             DomEffectList = DomEffectsList,
+                             haploMat = haploMat,
+                             recombFreqMat = recombFreqMat, 
+                             ncores = 6)
+```
+
+The results are a nested list structure. Let's unpack them...
+
+```{r}
+library(tidyverse); library(magrittr)
+```
+
+```{r}
+mtpred
+```
+
+The list element **"varcovars"** 
+```{r}
+mtpred$varcovars %>% 
+  tidyr::unnest_wider(varcomps)
+```
+
+```{r}
+mtpred$varcovars %>% 
+  tidyr::unnest_wider(varcomps) %>% 
+  dplyr::select(-totcomputetime) %>% 
+  tidyr::unnest(predictedfamvars) %>% 
+  tidyr::unnest(predVars) %>% head
+```
+## TEST AND FIX ERROR DISCOVERED
+
+### Testing
+The result does not look like it should. All VarD == 0. Selfs are wrong.... 
+
+Compare outputs between multi-trait and single-trait functions.
+```{r, eval=F}
+rm(list=ls())
+data("AddEffectsList"); data("DomEffectsList")
+data("haploMat"); data("genmap")
+recombFreqMat<-1-(2*genmap2recombfreq(genmap,nChr = 2))
+CrossesToPredict<-crosses2predict(parents = c("1","2","11"))
+```
+
+
+```{r, eval=F}
+addEffectsT1<-t(AddEffectsList$Trait1)
+domEffectsT1<-t(DomEffectsList$Trait1)
+predCrossVarAD(sireID = "1", damID = "1", 
+              addEffects = addEffectsT1,
+              domEffects = domEffectsT1,
+              haploMat = haploMat,
+              recombFreqMat = recombFreqMat)
+```
+
+```{r, eval=F}
+predOneCrossVarAD(Trait1="Trait1",Trait2="Trait1",
+                  sireID = "1", damID = "1",
+                  haploMat = haploMat,
+                  recombFreqMat = recombFreqMat,
+                  predType = "VPM",
+                  postMeanAddEffects=AddEffectsList,
+                  postMeanDomEffects=DomEffectsList)
+```
+
+Obviously there is a bug.
+
+Compare the single-trait and multi-trait functions on a single _self_ cross.
+```{r, eval=F}
+sireID = "1"
+damID = "1"
+# postMeanAddEffects = AddEffectsList # <-- this was wrong format, should be list of named vectors NOT matrices
+# postMeanDomEffects = DomEffectsList #     see below
+AddEffectList<-AddEffectsList; # argument to runMtCrossVarPreds is "EffectList" not "EffectsList", ugh.
+DomEffectList<-DomEffectsList
+```
+
+```{r, eval=F}
+# this first part is identical for both functions
+x<-colSums(rbind(haploMat[grep(paste0("^",sireID,"_"),rownames(haploMat)),],
+                 haploMat[grep(paste0("^",damID,"_"),rownames(haploMat)),]))
+segsnps2keep<-names(x[x>0 & x<4])
+#if(length(segsnps2keep)>0){
+  # multi-trait
+  recombFreqMat<-recombFreqMat[segsnps2keep,segsnps2keep]
+  # single-trait
+  recombFreqMat<-recombFreqMat[segsnps2keep,segsnps2keep,drop=F]
+  ## These 2 are identical, but the single-trait is better b/c it performs correctly if only 1 segsnp2keep
+
+  # Next multi-trait code subsets haploMat
+  # But single-trait does not
+  # I think I did this to save memory
+  # the function calcGameticLD does the subsetting for the single-trait function
+  # do they behave correctly!???
+
+parents<-c(sireID,damID) # multi-trait
+
+haploMat_mt<-haploMat[sort(c(paste0(parents,"_HapA"),paste0(parents,"_HapB"))),segsnps2keep]
+#    1_28 1_35 1_40 1_41 2_4 2_23 2_25 2_26 2_41
+# 1_HapA    1    1    0    1   0    0    1    0    1
+# 1_HapA    1    1    0    1   0    0    1    0    1
+# 1_HapB    0    0    1    0   1    1    0    1    0
+# 1_HapB    0    0    1    0   1    1    0    1    0
+# This ordering isn't quite right... but not necessarily wrong
+
+haploMat_st<-haploMat[,segsnps2keep,drop=F]
+#      1_28 1_35 1_40 1_41 2_4 2_23 2_25 2_26 2_41
+# 1_HapA      1    1    0    1   0    0    1    0    1
+# 1_HapB      0    0    1    0   1    1    0    1    0
+# 2_HapA      1    0    0    0   0    1    0    1    1
+# 2_HapB      1    1    1    0   0    0    1    0    0
+# 3_HapA      0    1    0    0   0    0    0    0    1
+# 3_HapB      0    0    0    0   0    1    1    0    1
+dim(haploMat_st) # [1] 200   9
+dim(haploMat_mt) # [1] 4 9
+
+# multi-trait
+postMeanAddEffects_mt<-purrr::map(postMeanAddEffects,~.[segsnps2keep])
+postMeanDomEffects_mt<-purrr::map(postMeanDomEffects,~.[segsnps2keep])
+str(postMeanAddEffects_mt)
+# List of 2
+#  $ Trait1: num [1:9] NA NA NA NA NA NA NA NA NA
+#  $ Trait2: num [1:9] NA NA NA NA NA NA NA NA NA
+
+# that's not right either... and is separate from the issue in handling haploMat
+postMeanAddEffects[[1]][segsnps2keep] # [1] NA NA NA NA NA NA NA NA NA
+# because it's a list of matirces....
+postMeanAddEffects[[1]][,segsnps2keep] # whereas this works as expected
+#      1_28        1_35        1_40        1_41         2_4        2_23        2_25        2_26        2_41 
+# -0.11373077  0.27232134 -0.91807158 -0.09841001  0.36033139 -0.63155737 -0.06716992  0.17660915  0.22076979 
+
+# but why did it work in the analyses for the manuscript!?
+# or did it NOT work!? X_X
+```
+
+```{r, eval=F}
+# ... now I realize predOneCrossVarAD was meant to be called inside runMtCrossVarPredsAD.... 
+# what does that do the input arguments passed to predOneCrossVarAD?
+
+# the documentation I wrote for predOneCrossVarAD() _actually_ specifies that
+# the input e.g. postMeanAddEffects is a "list of named vectors (or column matrices)"
+# NOT the row matrices I was passing here
+
+# FROM runMtCrossVarPredsAD
+traits<-names(AddEffectList)
+parents<-union(CrossesToPredict$sireID,
+               CrossesToPredict$damID)
+
+# Center posterior distribution of effects
+## on posterior mean across MCMC samples
+AddEffectList<-purrr::map(AddEffectList,~scale(.,center = T, scale = F))
+# DomEffectList<-purrr::map(AddEffectList,~scale(.,center = T, scale = F)) # <-- found a new error!
+## the code above was a mistake I induced yesterday while removing usage of the magrittr %<>% operator.
+## caused the varD == 0 in the test above
+## fixed now. Doesn't effect analyses in the MS
+DomEffectList<-purrr::map(DomEffectList,~scale(.,center = T, scale = F))
+
+## in the case of REML or when only one set of effects (posterior-means from MCMC) are supplied
+## this step of mean-centering has not effect. 
+## It only matters if the predType="PMV" analysis is chosen.
+
+# STILL FROM runMtCrossVarPredsAD
+postMeanAddEffects<-purrr::map(AddEffectList,~attr(.,which = "scaled:center"))
+postMeanDomEffects<-purrr::map(DomEffectList,~attr(.,which = "scaled:center"))
+postMeanAddEffects[[1]] %>% class # [1] "numeric"
+#### and 'lo we have a list of numeric, named vectors, instead of a list of row-matrices
+#### which will be the properly formatted input to predOneCrossVarAD()
+
+## Predict trait (co)variances
+varcovars<-dplyr::bind_rows(tibble::tibble(Trait1=traits,Trait2=traits), # trait variances
+                            combn(traits,2,simplify = T) %>% # covariances
+                              t(.) %>% #
+                              `colnames<-`(.,c("Trait1","Trait2")) %>%
+                              tibble::as_tibble(.))
+
+haploMat_mt<-haploMat[sort(c(paste0(parents,"_HapA"),paste0(parents,"_HapB"))),]
+#         1_5 1_6 1_14 1_16 1_28 1_31 1_33 1_35 1_40 1_41 2_4 2_11 2_23 2_24 2_25 2_26 2_38 2_39 2_41 2_50
+# 1_HapA    1   0    1    0    1    1    0    1    0    1   0    0    0    1    1    0    0    0    1    1
+# 1_HapB    1   0    1    0    0    1    0    0    1    0   1    0    1    1    0    1    0    0    0    1
+# 11_HapA   0   1    1    1    1    1    1    0    1    0   0    0    0    1    0    1    1    1    1    0
+# 11_HapB   1   1    0    0    1    1    1    1    1    1   1    0    1    0    0    1    0    0    0    0
+# 2_HapA    0   0    0    0    1    0    0    0    0    0   0    1    1    0    0    1    0    1    1    0
+# 2_HapB    1   0    0    1    1    0    1    1    1    0   0    0    0    0    1    0    0    0    0    1
+
+#   if(predType!="PMV"){ #<- predType defaults to this in runMtCrossVarPredsAD()
+      AddEffectList<-NULL;
+      DomEffectList<-NULL;
+#   }
+
+predType = "VPM"
+ncores = 1
+# next runMtCrossVarPredsAD() maps predCrossVarsAD() over each trait variance and trait-trait covar to be predicted
+## as indicated in the tibble "varcovars"
+
+# varcovars<-varcovars %>%
+#   dplyr::mutate(varcomps=purrr::pmap(.,predCrossVarsAD,CrossesToPredict=CrossesToPredict,predType=predType,
+#                                      AddEffectList=AddEffectList,DomEffectList=DomEffectList,
+#                                      haploMat=haploMat,recombFreqMat=recombFreqMat,
+#                                      postMeanAddEffects=postMeanAddEffects,postMeanDomEffects=postMeanDomEffects,ncores=ncores))
+# [1] "Variances predicted for family: 1x1- took 0.002 mins"
+# Error: Problem with `mutate()` input `varcomps`. x Problem with `mutate()` input `predVars`. x subscript out of bounds ℹ Input `predVars` is `furrr::future_pmap(...)`. ℹ Input `varcomps` is `purrr::pmap(...)`. Run `rlang::last_error()` to see where the error occurred.
+
+# rlang::last_error()
+# <error/dplyr:::mutate_error>
+# Problem with `mutate()` input `varcomps`.
+# x Problem with `mutate()` input `predVars`.
+# x subscript out of bounds
+# ℹ Input `predVars` is `furrr::future_pmap(...)`.
+# ℹ Input `varcomps` is `purrr::pmap(...)`.
+# Backtrace:
+#   Run `rlang::last_trace()` to see the full context.
+
+Trait1<-varcovars$Trait1[1]
+Trait2<-varcovars$Trait2[1]
+# predCrossVarsAD()
+postVarCovarOfAddEffects<-NULL;
+postVarCovarOfDomEffects<-NULL
+
+
+# require(furrr); options(mc.cores=ncores); plan(multisession)
+# predictedfamvars<-CrossesToPredict %>%
+#   dplyr::mutate(predVars=furrr::future_pmap(.,
+#                                             predOneCrossVarAD,
+#                                             Trait1=Trait1,Trait2=Trait2,
+#                                             haploMat=haploMat_mt, # <-- NOTE THE CHANGE HERE FOR THE TEST (haploMat_mt instead of haploMat)
+#                                             recombFreqMat=recombFreqMat,
+#                                             predType=predType,
+#                                             postMeanAddEffects=postMeanAddEffects,
+#                                             postMeanDomEffects=postMeanDomEffects,
+#                                             postVarCovarOfAddEffects=postVarCovarOfAddEffects,
+#                                             postVarCovarOfDomEffects=postVarCovarOfDomEffects))
+
+
+# rlang::last_error()
+# rlang::last_trace()
+
+# predOneCrossVarAD()
+x<-colSums(rbind(haploMat_mt[grep(paste0("^",sireID,"_"),rownames(haploMat_mt)),],
+                    haploMat_mt[grep(paste0("^",damID,"_"),rownames(haploMat_mt)),]))
+segsnps2keep<-names(x[x>0 & x<4])
+
+recombFreqMat<-recombFreqMat[segsnps2keep,segsnps2keep]
+parents<-c(sireID,damID)
+haploMat_mt<-haploMat_mt[sort(c(paste0(parents,"_HapA"),paste0(parents,"_HapB"))),segsnps2keep]
+#        1_28 1_35 1_40 1_41 2_4 2_23 2_25 2_26 2_41
+# 1_HapA    1    1    0    1   0    0    1    0    1
+# 1_HapA    1    1    0    1   0    0    1    0    1
+# 1_HapB    0    0    1    0   1    1    0    1    0
+# 1_HapB    0    0    1    0   1    1    0    1    0      
+
+postMeanAddEffects<-purrr::map(postMeanAddEffects,~.[segsnps2keep])
+postMeanDomEffects<-purrr::map(postMeanDomEffects,~.[segsnps2keep])
+
+# sire and dam LD matrices
+
+# sireLD<-calcGameticLD(sireID,recombFreqMat,haploMat)
+# damLD<-calcGameticLD(damID,recombFreqMat,haploMat)
+# progenyLD<-sireLD+damLD
+
+parentGID<-"1"
+# calcGameticLD<-function(parentGID,recombFreqMat,haploMat){
+
+X<-haploMat_mt[grep(paste0("^",parentGID,"_"),rownames(haploMat_mt)),,drop=F] # from recent update adding "^" to regex
+#        1_28 1_35 1_40 1_41 2_4 2_23 2_25 2_26 2_41
+# 1_HapA    1    1    0    1   0    0    1    0    1
+# 1_HapA    1    1    0    1   0    0    1    0    1
+# 1_HapB    0    0    1    0   1    1    0    1    0
+# 1_HapB    0    0    1    0   1    1    0    1    0
+
+### THAT IS NOT GOOD. SHOULD GRAB ONLY ONE COPY OF PARENT HAPLOS
+### INSTEAD GRABS TWO.... this is BAD.... means the self-results in the manuscript are an error!
+### SHOULD BE QUICK RE-CALC BECAUSE only around 306 selfs to predict, but it requires some re-writing...
+### should also effect accuracies for the 3 selfs in the cross-val dataset
+# X<-haploMat_mt[grep(paste0(parentGID,"_"),rownames(haploMat_mt)),,drop=F] # from MS version
+D<-recombFreqMat*((0.5*crossprod(X))-tcrossprod(colMeans(X)))
+D
+#            1_28       1_35       1_40       1_41         2_4       2_23       2_25       2_26        2_41
+# 1_28  0.7500000  0.5636080 -0.1531879  0.4411835  0.00000000  0.0000000  0.0000000  0.0000000  0.00000000
+# 1_35  0.5636080  0.7500000 -0.2038490  0.5870883  0.00000000  0.0000000  0.0000000  0.0000000  0.00000000
+# 1_40 -0.1531879 -0.2038490  0.7500000 -0.2400014  0.00000000  0.0000000  0.0000000  0.0000000  0.00000000
+# 1_41  0.4411835  0.5870883 -0.2400014  0.7500000  0.00000000  0.0000000  0.0000000  0.0000000  0.00000000
+# 2_4   0.0000000  0.0000000  0.0000000  0.0000000  0.75000000  0.3453516 -0.1060932  0.3055502 -0.05521622
+# 2_23  0.0000000  0.0000000  0.0000000  0.0000000  0.34535159  0.7500000 -0.2304026  0.6635633 -0.11991307
+# 2_25  0.0000000  0.0000000  0.0000000  0.0000000 -0.10609321 -0.2304026  0.7500000 -0.2400014  0.39033759
+# 2_26  0.0000000  0.0000000  0.0000000  0.0000000  0.30555018  0.6635633 -0.2400014  0.7500000 -0.13553312
+# 2_41  0.0000000  0.0000000  0.0000000  0.0000000 -0.05521622 -0.1199131  0.3903376 -0.1355331  0.75000000
+```
+```{r, eval=F}
+## this is correct, the above version is incorrect
+X<-haploMat_mt[c("1_HapA","1_HapB"),,drop=F] # from recent update adding "^" to regex
+D<-recombFreqMat*((0.5*crossprod(X))-tcrossprod(colMeans(X)))
+D
+#            1_28       1_35       1_40       1_41         2_4       2_23       2_25       2_26        2_41
+# 1_28  0.2500000  0.1878693 -0.1531879  0.1470612  0.00000000  0.0000000  0.0000000  0.0000000  0.00000000
+# 1_35  0.1878693  0.2500000 -0.2038490  0.1956961  0.00000000  0.0000000  0.0000000  0.0000000  0.00000000
+# 1_40 -0.1531879 -0.2038490  0.2500000 -0.2400014  0.00000000  0.0000000  0.0000000  0.0000000  0.00000000
+# 1_41  0.1470612  0.1956961 -0.2400014  0.2500000  0.00000000  0.0000000  0.0000000  0.0000000  0.00000000
+# 2_4   0.0000000  0.0000000  0.0000000  0.0000000  0.25000000  0.1151172 -0.1060932  0.1018501 -0.05521622
+# 2_23  0.0000000  0.0000000  0.0000000  0.0000000  0.11511720  0.2500000 -0.2304026  0.2211878 -0.11991307
+# 2_25  0.0000000  0.0000000  0.0000000  0.0000000 -0.10609321 -0.2304026  0.2500000 -0.2400014  0.13011253
+# 2_26  0.0000000  0.0000000  0.0000000  0.0000000  0.10185006  0.2211878 -0.2400014  0.2500000 -0.13553312
+# 2_41  0.0000000  0.0000000  0.0000000  0.0000000 -0.05521622 -0.1199131  0.1301125 -0.1355331  0.25000000
+```
+```{r, eval=F}
+# So as a final check
+### compute the parental gameticLDs correctly 
+### compare to results obtained with the single-trait function
+
+# since testing prediction of a self, just use D twice
+progenyLD<-D+D
+#            1_28       1_35       1_40       1_41        2_4       2_23       2_25       2_26       2_41
+# 1_28  0.5000000  0.3757386 -0.3063757  0.2941224  0.0000000  0.0000000  0.0000000  0.0000000  0.0000000
+# 1_35  0.3757386  0.5000000 -0.4076979  0.3913922  0.0000000  0.0000000  0.0000000  0.0000000  0.0000000
+# 1_40 -0.3063757 -0.4076979  0.5000000 -0.4800027  0.0000000  0.0000000  0.0000000  0.0000000  0.0000000
+# 1_41  0.2941224  0.3913922 -0.4800027  0.5000000  0.0000000  0.0000000  0.0000000  0.0000000  0.0000000
+# 2_4   0.0000000  0.0000000  0.0000000  0.0000000  0.5000000  0.2302344 -0.2121864  0.2037001 -0.1104324
+# 2_23  0.0000000  0.0000000  0.0000000  0.0000000  0.2302344  0.5000000 -0.4608052  0.4423755 -0.2398261
+# 2_25  0.0000000  0.0000000  0.0000000  0.0000000 -0.2121864 -0.4608052  0.5000000 -0.4800027  0.2602251
+# 2_26  0.0000000  0.0000000  0.0000000  0.0000000  0.2037001  0.4423755 -0.4800027  0.5000000 -0.2710662
+# 2_41  0.0000000  0.0000000  0.0000000  0.0000000 -0.1104324 -0.2398261  0.2602251 -0.2710662  0.5000000
+```
+```{r, eval=F}
+## Additive
+#### (Co)Variance of Posterior Means
+vpm_m2a<-postMeanAddEffects[[Trait1]]%*%progenyLD%*%postMeanAddEffects[[Trait2]]
+
+## Dominance
+#### (Co)Variance of Posterior Means
+progenyLDsq<-progenyLD^2
+vpm_m2d<-postMeanDomEffects[[Trait1]]%*%progenyLDsq%*%postMeanDomEffects[[Trait2]]
+vpm_m2a; vpm_m2d
+#           [,1]
+# [1,] 0.6173338
+#           [,1]
+# [1,] 0.3488516
+```
+THIS MATCHES EXACTLY THE RESULTS FOR SINGLE-TRAIT
+
+### Found bug effecting selfs
+
+**CONCLUSION:** The program was incorrectly doubling the number of haplotypes for self-crosses when predicting variances. Outcrosses were not effected and thus most results are not effected. 
+
+The impacts should not be severe, but require:
+
+1. Re-predict the 306 selfs in the exploratory prediction part of the MS. I guess self-crosses will not look as interesting.
+2. Re-predict the 3 selfs in the cross-validation study and re-calc. the prediction accuracies. It seems unlikely this would undermine anything seriously, but it is possible.
+
+Some re-writing to results and discussion will be needed, hopefully minor.
+
+### Fix and RE-TEST
+
+```{r, eval=F}
+rm(list=ls())
+data("AddEffectsList"); data("DomEffectsList")
+data("haploMat"); data("genmap")
+recombFreqMat<-1-(2*genmap2recombfreq(genmap,nChr = 2))
+CrossesToPredict<-crosses2predict(parents = c("1","2","11"))
+
+sireID = "1"
+damID = "1"
+# postMeanAddEffects = AddEffectsList # <-- this was wrong format, should be list of named vectors NOT matrices
+# postMeanDomEffects = DomEffectsList #     see below
+AddEffectList<-AddEffectsList; # argument to runMtCrossVarPreds is "EffectList" not "EffectsList", ugh.
+DomEffectList<-DomEffectsList
+
+x<-colSums(rbind(haploMat[grep(paste0("^",sireID,"_"),rownames(haploMat)),],
+                 haploMat[grep(paste0("^",damID,"_"),rownames(haploMat)),]))
+segsnps2keep<-names(x[x>0 & x<4])
+recombFreqMat<-recombFreqMat[segsnps2keep,segsnps2keep,drop=F]
+parents<-c(sireID,damID)
+
+haploMat[c(paste0(sireID,"_Hap",c("A","B")),paste0(damID,"_Hap",c("A","B"))),
+         segsnps2keep,drop=F]
+#        1_28 1_35 1_40 1_41 2_4 2_23 2_25 2_26 2_41
+# 1_HapA    1    1    0    1   0    0    1    0    1
+# 1_HapB    0    0    1    0   1    1    0    1    0
+# 1_HapA    1    1    0    1   0    0    1    0    1
+# 1_HapB    0    0    1    0   1    1    0    1    0
+
+# runMtCrossVarPredsAD()
+traits<-names(AddEffectList)
+parents<-union(CrossesToPredict$sireID,
+               CrossesToPredict$damID)
+AddEffectList<-purrr::map(AddEffectList,~scale(.,center = T, scale = F))
+DomEffectList<-purrr::map(DomEffectList,~scale(.,center = T, scale = F))
+postMeanAddEffects<-purrr::map(AddEffectList,~attr(.,which = "scaled:center"))
+postMeanDomEffects<-purrr::map(DomEffectList,~attr(.,which = "scaled:center"))
+varcovars<-dplyr::bind_rows(tibble::tibble(Trait1=traits,Trait2=traits), # trait variances
+                            combn(traits,2,simplify = T) %>% # covariances
+                              t(.) %>% #
+                              `colnames<-`(.,c("Trait1","Trait2")) %>%
+                              tibble::as_tibble(.))
+haploMat<-haploMat[sort(c(paste0(parents,"_HapA"),paste0(parents,"_HapB"))),]
+
+AddEffectList<-NULL;
+DomEffectList<-NULL;
+predType = "VPM"
+ncores = 1
+
+Trait1<-varcovars$Trait1[1]
+Trait2<-varcovars$Trait2[1]
+# predCrossVarsAD()
+postVarCovarOfAddEffects<-NULL
+postVarCovarOfDomEffects<-NULL
+x<-colSums(rbind(haploMat[grep(paste0("^",sireID,"_"),rownames(haploMat)),],
+                 haploMat[grep(paste0("^",damID,"_"),rownames(haploMat)),]))
+segsnps2keep<-names(x[x>0 & x<4])
+
+recombFreqMat<-recombFreqMat[segsnps2keep,segsnps2keep,drop=F]
+#parents<-c(sireID,damID)
+#haploMat<-haploMat[sort(c(paste0(parents,"_HapA"),paste0(parents,"_HapB"))),segsnps2keep,drop=F]
+haploMat<-haploMat[s,segsnps2keep,drop=F]
+
+postMeanAddEffects<-purrr::map(postMeanAddEffects,~.[segsnps2keep])
+postMeanDomEffects<-purrr::map(postMeanDomEffects,~.[segsnps2keep])
+
+#sireLD<-calcGameticLD(sireID,recombFreqMat,haploMat)
+parentID<-sireID
+X<-haploMat[paste0(parentID,c("_HapA","_HapB")),,drop=F]
+D<-recombFreqMat*((0.5*crossprod(X))-tcrossprod(colMeans(X)))
+sireLD<-D
+
+#damLD<-calcGameticLD(damID,recombFreqMat,haploMat)
+parentID<-sireID
+X<-haploMat[paste0(parentID,c("_HapA","_HapB")),,drop=F]
+D<-recombFreqMat*((0.5*crossprod(X))-tcrossprod(colMeans(X)))
+damLD<-D
+progenyLD<-sireLD+damLD
+vpm_m2a<-postMeanAddEffects[[Trait1]]%*%progenyLD%*%postMeanAddEffects[[Trait2]]
+progenyLDsq<-progenyLD^2
+vpm_m2d<-postMeanDomEffects[[Trait1]]%*%progenyLDsq%*%postMeanDomEffects[[Trait2]]
+vpm_m2a;vpm_m2d
+#           [,1]
+# [1,] 0.6173338
+#           [,1]
+# [1,] 0.3488516
+# Matches single-trait == CORRECT RESULT
+```
+
+Implement a small change in the `calcGameticLD()` function _and_ in the `predOneCrossVarAD()` and `predOneCrossVarA()` functions.
 
 
 # A note on marker effects input
@@ -270,8 +686,7 @@ str(AddEffectsList)
 
 -   Dimensions of each matrix of marker effects
 
-    -  $1 \times N_{snp}$: Many users will have marker effects estimated with REML or only want to use the posterior mean marker effects from a Bayesian marker-regression. For these users, the argument `predType=="VPM"` should be used *and* each matrix of the `AlleleSubEffectList` will have only one row.
-    -   $\frac{N_{iter} - N_{burnIn}}{N_{thin}} \times N_{snp}$: When predicting the Posterior Mean Variance (PMV), use argument `predType=="VPM"` when computing the predicted variance across a sample of marker effects, e.g. the thinned MCMC samples, usually stored on disk.
-
+    -   $1 \times N_{snp}$: Many users will have marker effects estimated with REML or only want to use the posterior mean marker effects from a Bayesian marker-regression. For these users, the argument `predType=="VPM"` should be used *and* each matrix of the `AlleleSubEffectList` will have only one row.
+    -   $\frac{N_{iter} - N_{burnIn}}{N_{thin}} \times N_{snp}$: When predicting the Posterior Mean Variance (PMV), use argument `predType=="PMV"` when computing the predicted variance across a sample of marker effects, e.g. the thinned MCMC samples, usually stored on disk.
 
 # References

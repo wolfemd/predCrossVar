@@ -266,7 +266,7 @@ genmap2recombfreq<-function(m,nChr){
 #'
 #' @examples
 calcGameticLD<-function(parentGID,recombFreqMat,haploMat){
-      X<-haploMat[grep(paste0("^",parentGID,"_"),rownames(haploMat)),,drop=F]
+      X<-haploMat[paste0(parentGID,c("_HapA","_HapB")),,drop=F]
       ### drop=F safegaurds against matrix->vector conversion if only 1 seg. locus (column)
       # Equiv versions (in case another is more efficient)
       # Version1
@@ -295,7 +295,7 @@ crosses2predict<-function(parents){
       CrossesToPredict<-matrix(NA,nrow=length(parents),ncol=length(parents))
       CrossesToPredict[upper.tri(CrossesToPredict,diag = T)]<-1
       rownames(CrossesToPredict)<-colnames(CrossesToPredict)<-parents
-      CrossesToPredict %<>%
+      CrossesToPredict<-CrossesToPredict %>%
             as.data.frame %>%
             tibble::rownames_to_column(var = "sireID") %>%
             tidyr::pivot_longer(cols = (-sireID), names_to = "damID", values_to = "keep") %>%

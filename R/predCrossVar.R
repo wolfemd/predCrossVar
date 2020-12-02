@@ -177,11 +177,11 @@ getMultiTraitPMVs_A<-function(AddEffectList, genoVarCovarMat){
 
    # Compute over each variance parameter
    varcovars<-varcovars %>%
-      mutate(varcomps=pmap(.,posteriorMeanVarCovarA,
+      dplyr::mutate(varcomps=purrr::pmap(.,posteriorMeanVarCovarA,
                            AddEffectList=AddEffectList,
                            postMeanAddEffects=postMeanAddEffects,
                            genoVarCovarMat=genoVarCovarMat)) %>%
-      unnest(varcomps)
+      tidyr::unnest(varcomps)
    return(varcovars)
 }
 
@@ -412,18 +412,24 @@ predOneCrossVarA<-function(Trait1,Trait2,sireID,damID,
       rm(progenyLD); gc()
 
       ## Tidy the results
-      out<-tibble::tibble(VarComp=c("VarA"),
-                          VPM=c(vpm_m2a),
-                          PMV=ifelse(predType=="PMV",c(pmv_m2a),c(NA)),
-                          Nsegsnps=c(length(segsnps2keep)),
-                          totcomputetime=c(totcomputetime))
+      # out<-tibble::tibble(VarComp=c("VarA"),
+      #                     VPM=c(vpm_m2a),
+      #                     PMV=ifelse(predType=="PMV",c(pmv_m2a),c(NA)),
+      #                     Nsegsnps=c(length(segsnps2keep)),
+      #                     totcomputetime=c(totcomputetime))
+      out<-tibble::tibble(VarComp="VarA",VPM=c(vpm_m2a),PMV=ifelse(predType=="PMV",pmv_m2a,NA)) %>%
+         dplyr::mutate(Nsegsnps=length(segsnps2keep),
+                       totcomputetime=c(totcomputetime))
+
+
+
       print(paste0("Variances predicted for family: ",sireID,"x",damID,"- took ",round(totcomputetime/60,3)," mins"))
    } else {
       out<-tibble::tibble(VarComp=c("VarA"),
                           VPM=c(0),
                           PMV=c(0),
                           Nsegsnps=c(0),
-                          computetime=c(0))
+                          computetime=c(NA))
       print(paste0("Variances predicted for family: ",sireID,"x",damID,"- had no segregating SNPs"))
    }
    return(out)
@@ -496,18 +502,24 @@ predOneCrossVarAD<-function(Trait1,Trait2,sireID,damID,
       rm(progenyLDsq,progenyLD); gc()
 
       ## Tidy the results
-      out<-tibble::tibble(VarComp=c("VarA","VarD"),
-                          VPM=c(vpm_m2a,vpm_m2d),
-                          PMV=ifelse(predType=="PMV",c(pmv_m2a,pmv_m2d),c(NA,NA)),
-                          Nsegsnps=c(length(segsnps2keep),NA),
-                          totcomputetime=c(totcomputetime,NA))
+      # out<-tibble::tibble(VarComp=c("VarA","VarD"),
+      #                     VPM=c(vpm_m2a,vpm_m2d),
+      #                     PMV=ifelse(predType=="PMV",c(pmv_m2a,pmv_m2d),c(NA,NA)),
+      #                     Nsegsnps=c(length(segsnps2keep),NA),
+      #                     totcomputetime=c(totcomputetime,NA))
+
+      out<-dplyr::bind_rows(tibble::tibble(VarComp="VarA",VPM=c(vpm_m2a),PMV=ifelse(predType=="PMV",pmv_m2a,NA)),
+                            tibble::tibble(VarComp="VarD",VPM=c(vpm_m2d),PMV=ifelse(predType=="PMV",pmv_m2d,NA))) %>%
+         dplyr::mutate(Nsegsnps=length(segsnps2keep),
+                       totcomputetime=c(totcomputetime,NA))
+
       print(paste0("Variances predicted for family: ",sireID,"x",damID,"- took ",round(totcomputetime/60,3)," mins"))
    } else {
       out<-tibble::tibble(VarComp=c("VarA","VarD"),
                           VPM=c(0,0),
                           PMV=c(0,0),
                           Nsegsnps=c(0,0),
-                          computetime=c(0,0))
+                          computetime=c(NA,NA))
       print(paste0("Variances predicted for family: ",sireID,"x",damID,"- had no segregating SNPs"))
    }
    return(out)

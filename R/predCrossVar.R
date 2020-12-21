@@ -65,14 +65,16 @@ posteriorMeanVarCovarA<-function(Trait1,Trait2,
    pmv_m2a<-vpm_m2a+sum(diag(genoVarCovarMat%*%postVarCovarOfAddEffects))
 
    # Tidy the results
-   out<-dplyr::bind_rows(tibble::tibble(VarComp=c("VarA"),
-                                        Method=c("M1"),
-                                        VPM=c(vpm_m1a), # NOTE: unsure relevance of "VPM" for Method 1, suggest ignoring
-                                        PMV=c(pmv_m1a)), #### PMV for Method 1 matches the standard VarComps you would get from BGLR
-                         tibble::tibble(VarComp=c("VarA"),
-                                        Method=c("M2"),
-                                        VPM=c(vpm_m2a),
-                                        PMV=c(pmv_m2a)))
+   out<-dplyr::bind_rows(tibble::tibble(VarComp="VarA",Method="M1",VPM=c(vpm_m1a),PMV=c(pmv_m1a)),
+                         tibble::tibble(VarComp="VarA",Method="M2",VPM=c(vpm_m2a),PMV=c(pmv_m2a)))
+   # out<-dplyr::bind_rows(tibble::tibble(VarComp=c("VarA"),
+   #                                      Method=c("M1"),
+   #                                      VPM=c(vpm_m1a), # NOTE: unsure relevance of "VPM" for Method 1, suggest ignoring
+   #                                      PMV=c(pmv_m1a)), #### PMV for Method 1 matches the standard VarComps you would get from BGLR
+   #                       tibble::tibble(VarComp=c("VarA"),
+   #                                      Method=c("M2"),
+   #                                      VPM=c(vpm_m2a),
+   #                                      PMV=c(pmv_m2a)))
    return(out)
 }
 
@@ -132,16 +134,24 @@ posteriorMeanVarCovarAD<-function(Trait1,Trait2,
    pmv_m2d<-vpm_m2d+sum(diag(genoVarCovarMatSq%*%postVarCovarOfDomEffects))
 
    # Tidy the results
-   out<-dplyr::bind_rows(tibble::tibble(VarComp=c("VarA","VarD"),
-                                        Method=c("M1","M1"),
-                                        VPM=c(vpm_m1a,vpm_m1d), # NOTE: unsure relevance of "VPM" for Method 1, suggest ignoring
-                                        PMV=c(pmv_m1a,pmv_m1d)), #### PMV for Method 1 matches the standard VarComps you would get from BGLR
-                         tibble::tibble(VarComp=c("VarA","VarD"),
-                                        Method=c("M2","M2"),
-                                        VPM=c(vpm_m2a,vpm_m2d),
-                                        PMV=c(pmv_m2a,pmv_m2d)))
+   out<-dplyr::bind_rows(dplyr::bind_rows(tibble::tibble(VarComp="VarA",Method="M1",VPM=c(vpm_m1a),PMV=c(pmv_m1a)),
+                                          tibble::tibble(VarComp="VarD",Method="M1",VPM=c(vpm_m1d),PMV=c(pmv_m1d))),
+                         dplyr::bind_rows(tibble::tibble(VarComp="VarA",Method="M2",VPM=c(vpm_m2a),PMV=c(pmv_m2a)),
+                                          tibble::tibble(VarComp="VarD",Method="M2",VPM=c(vpm_m2d),PMV=c(pmv_m2d))))
+
+   # out<-dplyr::bind_rows(tibble::tibble(VarComp=c("VarA","VarD"),
+   #                                      Method=c("M1","M1"),
+   #                                      VPM=c(vpm_m1a,vpm_m1d), # NOTE: unsure relevance of "VPM" for Method 1, suggest ignoring
+   #                                      PMV=c(pmv_m1a,pmv_m1d)), #### PMV for Method 1 matches the standard VarComps you would get from BGLR
+   #                       tibble::tibble(VarComp=c("VarA","VarD"),
+   #                                      Method=c("M2","M2"),
+   #                                      VPM=c(vpm_m2a,vpm_m2d),
+   #                                      PMV=c(pmv_m2a,pmv_m2d)))
+
    return(out)
 }
+
+
 
 #' getMultiTraitPMVs_A
 #'
@@ -173,7 +183,7 @@ getMultiTraitPMVs_A<-function(AddEffectList, genoVarCovarMat){
                                combn(traits,2,simplify = T) %>% # covariances
                                   t(.) %>% #
                                   `colnames<-`(.,c("Trait1","Trait2")) %>%
-                                  tibble::as_tibble)
+                                  tibble::as_tibble(.))
 
    # Compute over each variance parameter
    varcovars<-varcovars %>%
@@ -220,7 +230,7 @@ getMultiTraitPMVs_AD<-function(AddEffectList, DomEffectList, genoVarCovarMat){
                                combn(traits,2,simplify = T) %>% # covariances
                                   t(.) %>% #
                                   `colnames<-`(.,c("Trait1","Trait2")) %>%
-                                  tibble::as_tibble)
+                                  tibble::as_tibble(.))
 
    # Compute over each variance parameter
    varcovars<-varcovars %>%
